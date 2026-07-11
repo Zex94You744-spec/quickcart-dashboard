@@ -99,7 +99,7 @@ export default function TrackingPage() {
             <div>
               <span className="text-sm text-gray-600">Items:</span>
               <ul className="list-disc list-inside mt-1">
-                {Array.isArray(order.items) ? order.items.map((item, idx) => (
+                {Array.isArray(order.items) ? order.items.map((item: any, idx: number) => (
                   <li key={idx} className="text-gray-900">{item}</li>
                 )) : <li className="text-gray-900">{order.items}</li>}
               </ul>
