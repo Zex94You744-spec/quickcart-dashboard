@@ -25,7 +25,7 @@ export default function TrackingPage() {
     }
   }
 
-  const getStatusStep = (status) => {
+  const getStatusStep = (status: string) => {
     switch(status) {
       case 'pending': return 1;
       case 'accepted': return 2;

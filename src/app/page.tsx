@@ -32,7 +32,7 @@ export default function Dashboard() {
     }
   }
 
-  async function fetchOrders(sId) {
+  async function fetchOrders(sId: string) {
     const { data, error } = await supabase.from('orders').select('*').eq('shop_id', sId).order('created_id', { ascending: false });
     if (data) { setOrders(data); setLoading(false); }
   }
