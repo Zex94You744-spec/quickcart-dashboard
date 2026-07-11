@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 
 export default function TrackingPage() {
   const params = useParams();
-  const [order, setOrder] = useState(null);
+  const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
