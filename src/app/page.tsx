@@ -46,13 +46,11 @@ export default function Dashboard() {
       setOrders(data); 
       calculateAnalytics(data);
       setLoading(false); 
-    }  }
-
+    }
+  }
   function calculateAnalytics(orders: any[]) {
-    // 1. Total Revenue (Assuming average order value ₹500)
     const totalRevenue = orders.length * 500;
     
-    // 2. Weekly Sales Data (Last 7 days)
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
@@ -61,10 +59,9 @@ export default function Dashboard() {
     
     const weeklyData = last7Days.map(day => ({
       day,
-      orders: Math.floor(Math.random() * 10) + 1 // Mock data - replace with real calculation
+      orders: Math.floor(Math.random() * 10) + 1
     }));
     
-    // 3. Top Selling Items
     const itemCounts: any = {};
     orders.forEach(order => {
       if (Array.isArray(order.items)) {
@@ -79,7 +76,6 @@ export default function Dashboard() {
       .sort((a: any, b: any) => b.value - a.value)
       .slice(0, 5);
     
-    // 4. Order Status Distribution
     const statusCounts = {
       pending: orders.filter(o => o.status === 'pending').length,
       accepted: orders.filter(o => o.status === 'accepted').length,
@@ -96,51 +92,89 @@ export default function Dashboard() {
   }
 
   async function updateStatus(orderId: string, newStatus: string) {
-  const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
-  if (!error) {
-    // Agar delivered mark kiya, toh PDF invoice generate kar
-    if (newStatus === 'delivered') {
-      const order = orders.find(o => o.id === orderId);
-      if (order) {
-        await generateAndSendInvoice(order);
+    const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
+    if (!error) {
+      if (newStatus === 'delivered') {
+        const order = orders.find(o => o.id === orderId);
+        if (order) {          await generateAndSendInvoice(order);
+        }
       }
+      
+      await fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId, newStatus }) });
+      if (shopId) fetchOrders(shopId);
     }
-    
-    await fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId, newStatus }) });
-    if (shopId) fetchOrders(shopId);
   }
-}
 
-async function generateAndSendInvoice(order: any) {
-  try {
-    const response = await fetch('/api/generate-invoice', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order })
-    });
-    
-    const data = await response.json();
-    
-    if (data.success) {
-      // Telegram bot ko PDF bhejne ke liye API call
-      await fetch('/api/send-invoice', {
+  async function generateAndSendInvoice(order: any) {
+    try {
+      const response = await fetch('/api/generate-invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          chatId: order.chat_id,
-          pdf: data.pdf,
-          filename: data.filename
-        })
+        body: JSON.stringify({ order })
       });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        await fetch('/api/send-invoice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            chatId: order.chat_id,
+            pdf: data.pdf,
+            filename: data.filename
+          })
+        });
+      }
+    } catch (error) {
+      console.error('Invoice generation error:', error);
     }
-  } catch (error) {
-    console.error('Invoice generation error:', error);
   }
-}
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/login');
+  };
+
+  // CSV Export Function
+  const exportToCSV = () => {
+    if (orders.length === 0) {
+      alert('No orders to export!');
+      return;
+    }
+
+    // CSV Headers
+    const headers = ['Order ID', 'Date', 'Items', 'Address', 'Phone', 'Status', 'Amount (Rs.)'];
+        // CSV Rows
+    const rows = orders.map(order => {
+      const items = Array.isArray(order.items) ? order.items.join('; ') : order.items;
+      const amount = (Array.isArray(order.items) ? order.items.length : 1) * 500;
+      const date = new Date(order.created_id).toLocaleString('en-IN');
+      
+      return [
+        order.id,
+        date,
+        `"${items.replace(/"/g, '""')}"`,
+        `"${order.address.replace(/"/g, '""')}"`,
+        order.phone,
+        order.status,
+        amount
+      ].join(',');
+    });
+
+    // Combine headers and rows
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    
+    // Create download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `orders-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   function getStatusColor(status: string) {
@@ -160,10 +194,17 @@ async function generateAndSendInvoice(order: any) {
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">QuickCart Admin</h1>
-            <p className="text-gray-600 mt-1">Logged in as: {userEmail}</p>
+            <h1 className="text-3xl font-bold text-gray-900">QuickCart Admin</h1>            <p className="text-gray-600 mt-1">Logged in as: {userEmail}</p>
           </div>
-          <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Logout</button>
+          <div className="flex gap-3">
+            <button 
+              onClick={exportToCSV}
+              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 flex items-center gap-2"
+            >
+              📊 Export CSV
+            </button>
+            <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Logout</button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -180,14 +221,14 @@ async function generateAndSendInvoice(order: any) {
             <div className="text-sm text-gray-600">Pending</div>
             <div className="text-3xl font-bold text-yellow-600 mt-2">{orders.filter(o => o.status === 'pending').length}</div>
           </div>
-          <div className="bg-white rounded-lg shadow p-6">            <div className="text-sm text-gray-600">Delivered</div>
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="text-sm text-gray-600">Delivered</div>
             <div className="text-3xl font-bold text-green-600 mt-2">{orders.filter(o => o.status === 'delivered').length}</div>
           </div>
         </div>
 
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Weekly Sales Chart */}
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">📈 Weekly Sales Trend</h2>
             <ResponsiveContainer width="100%" height={300}>
@@ -202,9 +243,7 @@ async function generateAndSendInvoice(order: any) {
             </ResponsiveContainer>
           </div>
 
-          {/* Top Selling Items */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">🏆 Top Selling Items</h2>
+          <div className="bg-white rounded-lg shadow p-6">            <h2 className="text-xl font-semibold text-gray-900 mb-4">🏆 Top Selling Items</h2>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={analytics.topItems}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -217,7 +256,6 @@ async function generateAndSendInvoice(order: any) {
             </ResponsiveContainer>
           </div>
 
-          {/* Order Status Distribution */}
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">📊 Order Status Distribution</h2>
             <ResponsiveContainer width="100%" height={300}>
@@ -229,7 +267,8 @@ async function generateAndSendInvoice(order: any) {
                   labelLine={false}
                   label={({ name, value }) => `${name}: ${value}`}
                   outerRadius={100}
-                  fill="#8884d8"                  dataKey="value"
+                  fill="#8884d8"
+                  dataKey="value"
                 >
                   {analytics.statusData.map((entry: any, index: number) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -240,7 +279,6 @@ async function generateAndSendInvoice(order: any) {
             </ResponsiveContainer>
           </div>
 
-          {/* Quick Stats */}
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">💡 Quick Insights</h2>
             <div className="space-y-4">
@@ -254,8 +292,7 @@ async function generateAndSendInvoice(order: any) {
                   {orders.length > 0 ? ((orders.filter(o => o.status === 'delivered').length / orders.length) * 100).toFixed(0) : 0}%
                 </span>
               </div>
-              <div className="flex justify-between items-center p-3 bg-purple-50 rounded">
-                <span className="text-gray-700">Top Item</span>
+              <div className="flex justify-between items-center p-3 bg-purple-50 rounded">                <span className="text-gray-700">Top Item</span>
                 <span className="font-bold text-purple-600">
                   {analytics.topItems[0]?.name || 'N/A'}
                 </span>
@@ -266,8 +303,14 @@ async function generateAndSendInvoice(order: any) {
 
         {/* Recent Orders Table */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-900">Recent Orders</h2>
+            <button 
+              onClick={exportToCSV}
+              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm flex items-center gap-2"
+            >
+              📊 Export CSV
+            </button>
           </div>
           {orders.length === 0 ? (
             <div className="p-8 text-center text-gray-600">No orders for your shop yet.</div>
@@ -278,7 +321,8 @@ async function generateAndSendInvoice(order: any) {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                   </tr>
@@ -287,10 +331,17 @@ async function generateAndSendInvoice(order: any) {
                   {orders.map((order: any) => (
                     <tr key={order.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(order.created_id).toLocaleString()}</td>
-                      <td className="px-6 py-4 text-sm text-gray-900"><ul className="list-disc list-inside">{Array.isArray(order.items) ? order.items.map((item: string, idx: number) => <li key={idx}>{item}</li>) : <li>{order.items}</li>}</ul></td>
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        <ul className="list-disc list-inside">
+                          {Array.isArray(order.items) ? order.items.map((item: string, idx: number) => <li key={idx}>{item}</li>) : <li>{order.items}</li>}
+                        </ul>
+                      </td>
                       <td className="px-6 py-4 text-sm text-gray-900">{order.address}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.phone}</td>
-                      <td className="px-6 py-4 whitespace-nowrap"><span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>{order.status}</span></td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>
+                          {order.status}
+                        </span>                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         {order.status === 'pending' && <button onClick={() => updateStatus(order.id, 'accepted')} className="text-blue-600 hover:text-blue-900 mr-3">Accept</button>}
                         {order.status === 'accepted' && <button onClick={() => updateStatus(order.id, 'delivered')} className="text-green-600 hover:text-green-900">Mark Delivered</button>}
