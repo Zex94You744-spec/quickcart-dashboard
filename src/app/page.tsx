@@ -6,8 +6,8 @@ import { supabase } from '@/lib/supabase';
 export default function Dashboard() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [shopId, setShopId] = useState(null);
-  const [userEmail, setUserEmail] = useState('');
+  const [shopId, setShopId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string>('');
   const router = useRouter();
 
   useEffect(() => {
@@ -22,7 +22,6 @@ export default function Dashboard() {
     }
     setUserEmail(user.email || '');
     
-    // User ki shop ID dhundo
     const { data: shop } = await supabase.from('shops').select('id').eq('owner_email', user.email).single();
     if (shop) {
       setShopId(shop.id);
@@ -37,19 +36,19 @@ export default function Dashboard() {
     if (data) { setOrders(data); setLoading(false); }
   }
 
-  async function updateStatus(orderId, newStatus) {
+  async function updateStatus(orderId: string, newStatus: string) {
     const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
     if (!error) {
       await fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId, newStatus }) });
-      fetchOrders(shopId);
+      if (shopId) fetchOrders(shopId);
     }
   }
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();    router.push('/login');
+    await supabase.auth.signOut();
+    router.push('/login');
   };
-
-  function getStatusColor(status) {
+  function getStatusColor(status: string) {
     switch(status) {
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'accepted': return 'bg-blue-100 text-blue-800';
@@ -95,9 +94,9 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {orders.map((order) => (                    <tr key={order.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(order.created_id).toLocaleString()}</td>
-                      <td className="px-6 py-4 text-sm text-gray-900"><ul className="list-disc list-inside">{Array.isArray(order.items) ? order.items.map((item, idx) => <li key={idx}>{item}</li>) : <li>{order.items}</li>}</ul></td>
+                  {orders.map((order: any) => (
+                    <tr key={order.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(order.created_id).toLocaleString()}</td>                      <td className="px-6 py-4 text-sm text-gray-900"><ul className="list-disc list-inside">{Array.isArray(order.items) ? order.items.map((item: string, idx: number) => <li key={idx}>{item}</li>) : <li>{order.items}</li>}</ul></td>
                       <td className="px-6 py-4 text-sm text-gray-900">{order.address}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.phone}</td>
                       <td className="px-6 py-4 whitespace-nowrap"><span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>{order.status}</span></td>
