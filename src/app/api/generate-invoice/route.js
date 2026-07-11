@@ -1,14 +1,168 @@
 import { NextResponse } from 'next/server';
-import { renderToBuffer } from '@react-pdf/renderer';
-import InvoicePDF from '@/components/InvoicePDF';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 export async function POST(request) {
   try {
     const { order } = await request.json();
     
-    // PDF render karo
-    const pdfBuffer = await renderToBuffer(<InvoicePDF order={order} />);
-    const pdfBase64 = pdfBuffer.toString('base64');
+    // Create PDF document
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([595, 842]); // A4 size
+    const { width, height } = page.getSize();
+    
+    // Load font
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    
+    // Header - Blue rectangle
+    page.drawRectangle({
+      x: 0,
+      y: height - 100,
+      width: width,
+      height: 100,
+      color: rgb(0.23, 0.51, 0.96),
+    });
+    
+    // Title
+    page.drawText('INVOICE', {
+      x: width / 2 - 60,
+      y: height - 60,
+      size: 32,
+      font: boldFont,
+      color: rgb(1, 1, 1),
+    });
+    
+    // Shop Info
+    page.drawText('QuickCart Store', {
+      x: 50,
+      y: height - 140,
+      size: 16,
+      font: boldFont,
+      color: rgb(0.12, 0.16, 0.24),
+    });
+    
+    page.drawText(`Order ID: ${order.id}`, {
+      x: 50,
+      y: height - 165,
+      size: 11,
+      font: font,
+      color: rgb(0.3, 0.35, 0.4),    });
+    
+    page.drawText(`Date: ${new Date(order.created_id).toLocaleDateString('en-IN')}`, {
+      x: 50,
+      y: height - 185,
+      size: 11,
+      font: font,
+      color: rgb(0.3, 0.35, 0.4),
+    });
+    
+    // Customer Info
+    page.drawText('Bill To:', {
+      x: 50,
+      y: height - 220,
+      size: 13,
+      font: boldFont,
+      color: rgb(0.12, 0.16, 0.24),
+    });
+    
+    page.drawText(`Phone: ${order.phone}`, {
+      x: 50,
+      y: height - 245,
+      size: 11,
+      font: font,
+      color: rgb(0.3, 0.35, 0.4),
+    });
+    
+    page.drawText(`Address: ${order.address}`, {
+      x: 50,
+      y: height - 265,
+      size: 11,
+      font: font,
+      color: rgb(0.3, 0.35, 0.4),
+    });
+    
+    // Table Header
+    const tableTop = height - 310;
+    page.drawRectangle({
+      x: 50,
+      y: tableTop,
+      width: 495,
+      height: 30,
+      color: rgb(0.23, 0.51, 0.96),
+    });
+    
+    page.drawText('#', { x: 60, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
+    page.drawText('Item', { x: 100, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
+    page.drawText('Qty', { x: 350, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
+    page.drawText('Price', { x: 410, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
+    page.drawText('Total', { x: 470, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });    
+    // Items
+    const items = Array.isArray(order.items) ? order.items : [order.items];
+    let y = tableTop - 30;
+    let totalAmount = 0;
+    
+    items.forEach((item, idx) => {
+      const price = 500;
+      const itemTotal = price;
+      totalAmount += itemTotal;
+      
+      // Alternate row color
+      if (idx % 2 === 0) {
+        page.drawRectangle({
+          x: 50,
+          y: y - 5,
+          width: 495,
+          height: 25,
+          color: rgb(0.95, 0.96, 0.97),
+        });
+      }
+      
+      page.drawText(String(idx + 1), { x: 60, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
+      page.drawText(item, { x: 100, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
+      page.drawText('1', { x: 350, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
+      page.drawText(`Rs.${price}`, { x: 410, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
+      page.drawText(`Rs.${itemTotal}`, { x: 470, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
+      
+      y -= 30;
+    });
+    
+    // Total Line
+    y -= 10;
+    page.drawLine({
+      start: { x: 50, y: y },
+      end: { x: 545, y: y },
+      thickness: 1,
+      color: rgb(0.8, 0.8, 0.8),
+    });
+    
+    y -= 25;
+    page.drawText(`Total Amount: Rs.${totalAmount}`, {
+      x: 380,
+      y: y,
+      size: 14,
+      font: boldFont,
+      color: rgb(0.06, 0.72, 0.51),
+    });
+    
+    // Footer    page.drawText('Thank you for shopping with us!', {
+      x: width / 2 - 100,
+      y: 60,
+      size: 10,
+      font: font,
+      color: rgb(0.42, 0.45, 0.5),
+    });
+    
+    page.drawText('For any queries, contact us.', {
+      x: width / 2 - 80,
+      y: 40,
+      size: 10,
+      font: font,
+      color: rgb(0.42, 0.45, 0.5),
+    });
+    
+    // Save PDF
+    const pdfBytes = await pdfDoc.save();
+    const pdfBase64 = Buffer.from(pdfBytes).toString('base64');
     
     return NextResponse.json({ 
       success: true, 
