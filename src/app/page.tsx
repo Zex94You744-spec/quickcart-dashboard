@@ -20,7 +20,7 @@ export default function Dashboard() {
       router.push('/login');
       return;
     }
-    setUserEmail(user.email);
+    setUserEmail(user.email || '');
     
     // User ki shop ID dhundo
     const { data: shop } = await supabase.from('shops').select('id').eq('owner_email', user.email).single();
