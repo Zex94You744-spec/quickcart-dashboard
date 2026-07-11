@@ -95,12 +95,48 @@ export default function Dashboard() {
     setAnalytics({ totalRevenue, weeklyData, topItems, statusData });
   }
 
-  async function updateStatus(orderId: string, newStatus: string) {    const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
-    if (!error) {
-      await fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId, newStatus }) });
-      if (shopId) fetchOrders(shopId);
+  async function updateStatus(orderId: string, newStatus: string) {
+  const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
+  if (!error) {
+    // Agar delivered mark kiya, toh PDF invoice generate kar
+    if (newStatus === 'delivered') {
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+        await generateAndSendInvoice(order);
+      }
     }
+    
+    await fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId, newStatus }) });
+    if (shopId) fetchOrders(shopId);
   }
+}
+
+async function generateAndSendInvoice(order: any) {
+  try {
+    const response = await fetch('/api/generate-invoice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      // Telegram bot ko PDF bhejne ke liye API call
+      await fetch('/api/send-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          chatId: order.chat_id,
+          pdf: data.pdf,
+          filename: data.filename
+        })
+      });
+    }
+  } catch (error) {
+    console.error('Invoice generation error:', error);
+  }
+}
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
