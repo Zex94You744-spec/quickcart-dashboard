@@ -35,29 +35,29 @@ export async function POST(request) {
     page.drawText('GST%', { x: 400, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
     page.drawText('Total', { x: 470, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
     
-    // Items - Handle both old (string) and new (object) formats
-    const items = Array.isArray(order.items) ? order.items : [];
+    // Items - Parse items properly
+    let items = [];
+    if (Array.isArray(order.items)) {
+      items = order.items.map(item => {
+        if (typeof item === 'string') {
+          return { name: item, price: 500, gst_rate: 18 };
+        } else if (typeof item === 'object' && item !== null) {
+          return {
+            name: String(item.name || 'Unknown Item'),
+            price: Number(item.price) || 500,
+            gst_rate: Number(item.gst_rate) || 18
+          };        }
+        return { name: 'Unknown Item', price: 500, gst_rate: 18 };
+      });
+    }
+    
     let y = tableTop - 30;
     let subtotal = 0;
     let gstTotal = 0;
     
     items.forEach((item, idx) => {
-      // Check if item is object or string
-      let itemName = 'Unknown Item';
-      let price = 500;
-      let gstRate = 18;
-            if (typeof item === 'string') {
-        // Old format: just string
-        itemName = item;
-        price = 500;
-        gstRate = 18;
-      } else if (typeof item === 'object' && item !== null) {
-        // New format: object with name, price, gst_rate
-        itemName = String(item.name || 'Unknown Item');
-        price = Number(item.price) || 500;
-        gstRate = Number(item.gst_rate) || 18;
-      }
-      
+      const price = item.price;
+      const gstRate = item.gst_rate;
       const gst = price * gstRate / 100;
       const itemTotal = price + gst;
       subtotal += price;
@@ -68,7 +68,7 @@ export async function POST(request) {
       }
       
       page.drawText(String(idx + 1), { x: 60, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
-      page.drawText(itemName, { x: 100, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
+      page.drawText(item.name, { x: 100, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
       page.drawText('Rs.' + price, { x: 320, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
       page.drawText(gstRate + '%', { x: 400, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
       page.drawText('Rs.' + itemTotal.toFixed(2), { x: 470, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
