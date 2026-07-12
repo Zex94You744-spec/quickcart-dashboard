@@ -18,13 +18,13 @@ export async function POST(request) {
     
     // Shop & Order Info
     page.drawText('QuickCart Store', { x: 50, y: height - 140, size: 16, font: boldFont, color: rgb(0.12, 0.16, 0.24) });
-    page.drawText('Order ID: ' + order.id, { x: 50, y: height - 165, size: 11, font: font, color: rgb(0.3, 0.35, 0.4) });
-    page.drawText('Date: ' + new Date(order.created_id).toLocaleDateString('en-IN'), { x: 50, y: height - 185, size: 11, font: font, color: rgb(0.3, 0.35, 0.4) });
+    page.drawText('Order ID: ' + String(order.id || 'N/A'), { x: 50, y: height - 165, size: 11, font: font, color: rgb(0.3, 0.35, 0.4) });
+    page.drawText('Date: ' + new Date(order.created_id || Date.now()).toLocaleDateString('en-IN'), { x: 50, y: height - 185, size: 11, font: font, color: rgb(0.3, 0.35, 0.4) });
     
     // Customer Info
     page.drawText('Bill To:', { x: 50, y: height - 220, size: 13, font: boldFont, color: rgb(0.12, 0.16, 0.24) });
-    page.drawText('Phone: ' + (order.phone || 'N/A'), { x: 50, y: height - 245, size: 11, font: font, color: rgb(0.3, 0.35, 0.4) });
-    page.drawText('Address: ' + (order.address || 'N/A'), { x: 50, y: height - 265, size: 11, font: font, color: rgb(0.3, 0.35, 0.4) });
+    page.drawText('Phone: ' + String(order.phone || 'N/A'), { x: 50, y: height - 245, size: 11, font: font, color: rgb(0.3, 0.35, 0.4) });
+    page.drawText('Address: ' + String(order.address || 'N/A'), { x: 50, y: height - 265, size: 11, font: font, color: rgb(0.3, 0.35, 0.4) });
     
     // Table Header
     const tableTop = height - 310;
@@ -43,22 +43,19 @@ export async function POST(request) {
     
     items.forEach((item, idx) => {
       // Check if item is object or string
-      let itemName, price, gstRate;
-      
-      if (typeof item === 'string') {
-        // Old format: just string        itemName = item;
+      let itemName = 'Unknown Item';
+      let price = 500;
+      let gstRate = 18;
+            if (typeof item === 'string') {
+        // Old format: just string
+        itemName = item;
         price = 500;
         gstRate = 18;
       } else if (typeof item === 'object' && item !== null) {
         // New format: object with name, price, gst_rate
-        itemName = item.name || 'Unknown Item';
-        price = item.price || 500;
-        gstRate = item.gst_rate || 18;
-      } else {
-        // Fallback
-        itemName = 'Unknown Item';
-        price = 500;
-        gstRate = 18;
+        itemName = String(item.name || 'Unknown Item');
+        price = Number(item.price) || 500;
+        gstRate = Number(item.gst_rate) || 18;
       }
       
       const gst = price * gstRate / 100;
@@ -95,10 +92,10 @@ export async function POST(request) {
     page.drawText('Grand Total:', { x: 350, y: y, size: 14, font: boldFont, color: rgb(0.12, 0.16, 0.24) });
     page.drawText('Rs.' + (subtotal + gstTotal).toFixed(2), { x: 470, y: y, size: 14, font: boldFont, color: rgb(0.06, 0.72, 0.51) });
     
-    // Footer    page.drawText('Thank you for shopping with us!', { x: width / 2 - 100, y: 60, size: 10, font: font, color: rgb(0.42, 0.45, 0.5) });
+    // Footer
+    page.drawText('Thank you for shopping with us!', { x: width / 2 - 100, y: 60, size: 10, font: font, color: rgb(0.42, 0.45, 0.5) });
     page.drawText('For any queries, contact us.', { x: width / 2 - 80, y: 40, size: 10, font: font, color: rgb(0.42, 0.45, 0.5) });
-    
-    const pdfBytes = await pdfDoc.save();
+        const pdfBytes = await pdfDoc.save();
     const pdfBase64 = Buffer.from(pdfBytes).toString('base64');
     
     return NextResponse.json({ success: true, pdf: pdfBase64, filename: 'invoice-' + order.id + '.pdf' });
