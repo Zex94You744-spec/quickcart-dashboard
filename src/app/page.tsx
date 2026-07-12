@@ -59,7 +59,7 @@ export default function Dashboard() {
         const gst = price * (item.gst_rate || 18) / 100;
         totalRevenue += (price + gst);
 
-        const itemName = item.name || 'Unknown';
+        const itemName = (typeof item === 'string' ? item : (item.name || 'Unknown'));
         itemCounts[itemName] = (itemCounts[itemName] || 0) + 1;
       });
     });
