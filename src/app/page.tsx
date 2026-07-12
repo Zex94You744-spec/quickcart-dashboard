@@ -43,10 +43,41 @@ export default function Dashboard() {
   async function fetchOrders(sId: string) {
     const { data, error } = await supabase.from('orders').select('*').eq('shop_id', sId).order('created_id', { ascending: false });
     if (data) { 
-      setOrders(data); 
-      calculateAnalytics(data);
+      // Parse items for each order
+      const parsedOrders = data.map(order => ({
+        ...order,
+        items: parseItems(order.items)      }));
+      setOrders(parsedOrders); 
+      calculateAnalytics(parsedOrders);
       setLoading(false); 
-    }  }
+    }
+  }
+
+  function parseItems(items: any) {
+    if (!items) return [];
+    if (Array.isArray(items)) {
+      return items.map(item => {
+        if (typeof item === 'string') {
+          return { name: item, price: 500, gst_rate: 18 };
+        }
+        return item;
+      });
+    }
+    try {
+      const parsed = JSON.parse(items);
+      if (Array.isArray(parsed)) {
+        return parsed.map(item => {
+          if (typeof item === 'string') {
+            return { name: item, price: 500, gst_rate: 18 };
+          }
+          return item;
+        });
+      }
+      return [parsed];
+    } catch (e) {
+      return [{ name: items, price: 500, gst_rate: 18 }];
+    }
+  }
 
   function calculateAnalytics(orders: any[]) {
     let totalRevenue = 0;
@@ -59,13 +90,12 @@ export default function Dashboard() {
         const gst = price * (item.gst_rate || 18) / 100;
         totalRevenue += (price + gst);
 
-        const itemName = (typeof item === 'string' ? item : (item.name || 'Unknown'));
+        const itemName = item.name || 'Unknown';
         itemCounts[itemName] = (itemCounts[itemName] || 0) + 1;
       });
     });
     
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
+    const last7Days = Array.from({ length: 7 }, (_, i) => {      const d = new Date();
       d.setDate(d.getDate() - (6 - i));
       return d.toLocaleDateString('en-US', { weekday: 'short' });
     });
@@ -95,7 +125,8 @@ export default function Dashboard() {
     setAnalytics({ totalRevenue: totalRevenue.toFixed(2), weeklyData, topItems, statusData });
   }
 
-  async function updateStatus(orderId: string, newStatus: string) {    const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
+  async function updateStatus(orderId: string, newStatus: string) {
+    const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
     if (!error) {
       if (newStatus === 'delivered') {
         const order = orders.find(o => o.id === orderId);
@@ -113,8 +144,7 @@ export default function Dashboard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ order })
-      });
-      const data = await response.json();
+      });      const data = await response.json();
       if (data.success) {
         await fetch('/api/send-invoice', {
           method: 'POST',
@@ -145,6 +175,7 @@ export default function Dashboard() {
       let subtotal = 0;
       let gstTotal = 0;
       let itemNames: string[] = [];
+
       items.forEach((item: any) => {
         const price = item.price || 500;
         const gstRate = item.gst_rate || 18;
@@ -162,8 +193,7 @@ export default function Dashboard() {
         `"${order.address.replace(/"/g, '""')}"`,
         order.phone,
         order.status,
-        subtotal,
-        gstTotal.toFixed(2),
+        subtotal,        gstTotal.toFixed(2),
         total.toFixed(2)
       ].join(',');
     });
@@ -193,7 +223,8 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-7xl mx-auto">        <div className="flex justify-between items-center mb-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">QuickCart Admin</h1>
             <p className="text-gray-600 mt-1">Logged in as: {userEmail}</p>
@@ -211,8 +242,7 @@ export default function Dashboard() {
           </div>
           <div className="bg-white rounded-lg shadow p-6">
             <div className="text-sm text-gray-600">Total Revenue</div>
-            <div className="text-3xl font-bold text-green-600 mt-2">₹{analytics.totalRevenue}</div>
-          </div>
+            <div className="text-3xl font-bold text-green-600 mt-2">₹{analytics.totalRevenue}</div>          </div>
           <div className="bg-white rounded-lg shadow p-6">
             <div className="text-sm text-gray-600">Pending</div>
             <div className="text-3xl font-bold text-yellow-600 mt-2">{orders.filter(o => o.status === 'pending').length}</div>
@@ -242,7 +272,8 @@ export default function Dashboard() {
             <h2 className="text-xl font-semibold text-gray-900 mb-4"> Top Selling Items</h2>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={analytics.topItems}>
-                <CartesianGrid strokeDasharray="3 3" />                <XAxis dataKey="name" />
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
                 <YAxis />
                 <Tooltip />
                 <Legend />
@@ -260,8 +291,7 @@ export default function Dashboard() {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
-              </PieChart>
+                <Tooltip />              </PieChart>
             </ResponsiveContainer>
           </div>
 
@@ -289,9 +319,10 @@ export default function Dashboard() {
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-900">Recent Orders</h2>
-            <button onClick={exportToCSV} className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm flex items-center gap-2">📊 Export CSV</button>
+            <button onClick={exportToCSV} className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm flex items-center gap-2"> Export CSV</button>
           </div>
-          {orders.length === 0 ? (            <div className="p-8 text-center text-gray-600">No orders for your shop yet.</div>
+          {orders.length === 0 ? (
+            <div className="p-8 text-center text-gray-600">No orders for your shop yet.</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
@@ -309,8 +340,7 @@ export default function Dashboard() {
                   {orders.map((order: any) => (
                     <tr key={order.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(order.created_id).toLocaleString()}</td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        <ul className="list-disc list-inside">
+                      <td className="px-6 py-4 text-sm text-gray-900">                        <ul className="list-disc list-inside">
                           {Array.isArray(order.items) ? order.items.map((item: any, idx: number) => <li key={idx}>{item.name} (Rs.{item.price})</li>) : <li>{order.items}</li>}
                         </ul>
                       </td>
