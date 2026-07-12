@@ -1,8 +1,52 @@
 import { NextResponse } from 'next/server';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
-export async function POST(request) {
-  try {
+function parseItems(items) {
+  if (!items) return [];
+  
+  // Agar items already array hai
+  if (Array.isArray(items)) {
+    return items.map(item => {
+      if (typeof item === 'string') {
+        return { name: item, price: 500, gst_rate: 18 };
+      } else if (typeof item === 'object' && item !== null) {
+        return {
+          name: String(item.name || 'Unknown Item'),
+          price: Number(item.price) || 500,
+          gst_rate: Number(item.gst_rate) || 18
+        };
+      }
+      return { name: 'Unknown Item', price: 500, gst_rate: 18 };
+    });
+  }
+  
+  // Agar items string hai (JSON)
+  if (typeof items === 'string') {
+    try {
+      const parsed = JSON.parse(items);
+      if (Array.isArray(parsed)) {
+        return parsed.map(item => {
+          if (typeof item === 'string') {
+            return { name: item, price: 500, gst_rate: 18 };
+          } else if (typeof item === 'object' && item !== null) {
+            return {
+              name: String(item.name || 'Unknown Item'),
+              price: Number(item.price) || 500,
+              gst_rate: Number(item.gst_rate) || 18
+            };
+          }
+          return { name: 'Unknown Item', price: 500, gst_rate: 18 };
+        });
+      }
+    } catch (e) {
+      return [{ name: items, price: 500, gst_rate: 18 }];
+    }
+  }
+  
+  return [{ name: 'Unknown Item', price: 500, gst_rate: 18 }];
+}
+
+export async function POST(request) {  try {
     const { order } = await request.json();
     
     const pdfDoc = await PDFDocument.create();
@@ -35,21 +79,8 @@ export async function POST(request) {
     page.drawText('GST%', { x: 400, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
     page.drawText('Total', { x: 470, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
     
-    // Items - Parse items properly
-    let items = [];
-    if (Array.isArray(order.items)) {
-      items = order.items.map(item => {
-        if (typeof item === 'string') {
-          return { name: item, price: 500, gst_rate: 18 };
-        } else if (typeof item === 'object' && item !== null) {
-          return {
-            name: String(item.name || 'Unknown Item'),
-            price: Number(item.price) || 500,
-            gst_rate: Number(item.gst_rate) || 18
-          };        }
-        return { name: 'Unknown Item', price: 500, gst_rate: 18 };
-      });
-    }
+    // Parse items properly
+    const items = parseItems(order.items);
     
     let y = tableTop - 30;
     let subtotal = 0;
@@ -64,8 +95,7 @@ export async function POST(request) {
       gstTotal += gst;
       
       if (idx % 2 === 0) {
-        page.drawRectangle({ x: 50, y: y - 5, width: 495, height: 25, color: rgb(0.95, 0.96, 0.97) });
-      }
+        page.drawRectangle({ x: 50, y: y - 5, width: 495, height: 25, color: rgb(0.95, 0.96, 0.97) });      }
       
       page.drawText(String(idx + 1), { x: 60, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
       page.drawText(item.name, { x: 100, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
@@ -95,7 +125,8 @@ export async function POST(request) {
     // Footer
     page.drawText('Thank you for shopping with us!', { x: width / 2 - 100, y: 60, size: 10, font: font, color: rgb(0.42, 0.45, 0.5) });
     page.drawText('For any queries, contact us.', { x: width / 2 - 80, y: 40, size: 10, font: font, color: rgb(0.42, 0.45, 0.5) });
-        const pdfBytes = await pdfDoc.save();
+    
+    const pdfBytes = await pdfDoc.save();
     const pdfBase64 = Buffer.from(pdfBytes).toString('base64');
     
     return NextResponse.json({ success: true, pdf: pdfBase64, filename: 'invoice-' + order.id + '.pdf' });
