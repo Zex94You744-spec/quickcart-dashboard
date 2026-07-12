@@ -46,10 +46,23 @@ export default function Dashboard() {
       setOrders(data); 
       calculateAnalytics(data);
       setLoading(false); 
-    }
-  }
+    }  }
+
   function calculateAnalytics(orders: any[]) {
-    const totalRevenue = orders.length * 500;
+    let totalRevenue = 0;
+    const itemCounts: any = {};
+
+    orders.forEach(order => {
+      const items = Array.isArray(order.items) ? order.items : [];
+      items.forEach((item: any) => {
+        const price = item.price || 500;
+        const gst = price * (item.gst_rate || 18) / 100;
+        totalRevenue += (price + gst);
+
+        const itemName = item.name || 'Unknown';
+        itemCounts[itemName] = (itemCounts[itemName] || 0) + 1;
+      });
+    });
     
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
@@ -61,15 +74,6 @@ export default function Dashboard() {
       day,
       orders: Math.floor(Math.random() * 10) + 1
     }));
-    
-    const itemCounts: any = {};
-    orders.forEach(order => {
-      if (Array.isArray(order.items)) {
-        order.items.forEach((item: string) => {
-          itemCounts[item] = (itemCounts[item] || 0) + 1;
-        });
-      }
-    });
     
     const topItems = Object.entries(itemCounts)
       .map(([name, count]) => ({ name, value: count }))
@@ -88,19 +92,17 @@ export default function Dashboard() {
       { name: 'Delivered', value: statusCounts.delivered }
     ].filter(item => item.value > 0);
     
-    setAnalytics({ totalRevenue, weeklyData, topItems, statusData });
+    setAnalytics({ totalRevenue: totalRevenue.toFixed(2), weeklyData, topItems, statusData });
   }
 
-  async function updateStatus(orderId: string, newStatus: string) {
-    const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
+  async function updateStatus(orderId: string, newStatus: string) {    const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
     if (!error) {
       if (newStatus === 'delivered') {
         const order = orders.find(o => o.id === orderId);
-        if (order) {          await generateAndSendInvoice(order);
+        if (order) {
+          await generateAndSendInvoice(order);
         }
       }
-      
-      await fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId, newStatus }) });
       if (shopId) fetchOrders(shopId);
     }
   }
@@ -112,18 +114,12 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ order })
       });
-      
       const data = await response.json();
-      
       if (data.success) {
         await fetch('/api/send-invoice', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            chatId: order.chat_id,
-            pdf: data.pdf,
-            filename: data.filename
-          })
+          body: JSON.stringify({ chatId: order.chat_id, pdf: data.pdf, filename: data.filename })
         });
       }
     } catch (error) {
@@ -136,36 +132,43 @@ export default function Dashboard() {
     router.push('/login');
   };
 
-  // CSV Export Function
   const exportToCSV = () => {
     if (orders.length === 0) {
       alert('No orders to export!');
       return;
     }
 
-    // CSV Headers
-    const headers = ['Order ID', 'Date', 'Items', 'Address', 'Phone', 'Status', 'Amount (Rs.)'];
-        // CSV Rows
+    const headers = ['Order ID', 'Date', 'Items', 'Address', 'Phone', 'Status', 'Subtotal', 'GST', 'Total'];
+    
     const rows = orders.map(order => {
-      const items = Array.isArray(order.items) ? order.items.join('; ') : order.items;
-      const amount = (Array.isArray(order.items) ? order.items.length : 1) * 500;
-      const date = new Date(order.created_id).toLocaleString('en-IN');
-      
+      const items = Array.isArray(order.items) ? order.items : [];
+      let subtotal = 0;
+      let gstTotal = 0;
+      let itemNames: string[] = [];
+      items.forEach((item: any) => {
+        const price = item.price || 500;
+        const gstRate = item.gst_rate || 18;
+        const gst = price * gstRate / 100;
+        subtotal += price;
+        gstTotal += gst;
+        itemNames.push(`${item.name} (Rs.${price})`);
+      });
+
+      const total = subtotal + gstTotal;
       return [
         order.id,
-        date,
-        `"${items.replace(/"/g, '""')}"`,
+        new Date(order.created_id).toLocaleString('en-IN'),
+        `"${itemNames.join('; ').replace(/"/g, '""')}"`,
         `"${order.address.replace(/"/g, '""')}"`,
         order.phone,
         order.status,
-        amount
+        subtotal,
+        gstTotal.toFixed(2),
+        total.toFixed(2)
       ].join(',');
     });
 
-    // Combine headers and rows
     const csvContent = [headers.join(','), ...rows].join('\n');
-    
-    // Create download link
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -190,24 +193,17 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
+      <div className="max-w-7xl mx-auto">        <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">QuickCart Admin</h1>            <p className="text-gray-600 mt-1">Logged in as: {userEmail}</p>
+            <h1 className="text-3xl font-bold text-gray-900">QuickCart Admin</h1>
+            <p className="text-gray-600 mt-1">Logged in as: {userEmail}</p>
           </div>
           <div className="flex gap-3">
-            <button 
-              onClick={exportToCSV}
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 flex items-center gap-2"
-            >
-              📊 Export CSV
-            </button>
+            <button onClick={exportToCSV} className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 flex items-center gap-2">📊 Export CSV</button>
             <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Logout</button>
           </div>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow p-6">
             <div className="text-sm text-gray-600">Total Orders</div>
@@ -227,7 +223,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">📈 Weekly Sales Trend</h2>
@@ -243,11 +238,11 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">            <h2 className="text-xl font-semibold text-gray-900 mb-4">🏆 Top Selling Items</h2>
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4"> Top Selling Items</h2>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={analytics.topItems}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
+                <CartesianGrid strokeDasharray="3 3" />                <XAxis dataKey="name" />
                 <YAxis />
                 <Tooltip />
                 <Legend />
@@ -257,19 +252,10 @@ export default function Dashboard() {
           </div>
 
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">📊 Order Status Distribution</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4"> Order Status Distribution</h2>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
-                <Pie
-                  data={analytics.statusData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, value }) => `${name}: ${value}`}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
+                <Pie data={analytics.statusData} cx="50%" cy="50%" labelLine={false} label={({ name, value }) => `${name}: ${value}`} outerRadius={100} fill="#8884d8" dataKey="value">
                   {analytics.statusData.map((entry: any, index: number) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
@@ -292,28 +278,20 @@ export default function Dashboard() {
                   {orders.length > 0 ? ((orders.filter(o => o.status === 'delivered').length / orders.length) * 100).toFixed(0) : 0}%
                 </span>
               </div>
-              <div className="flex justify-between items-center p-3 bg-purple-50 rounded">                <span className="text-gray-700">Top Item</span>
-                <span className="font-bold text-purple-600">
-                  {analytics.topItems[0]?.name || 'N/A'}
-                </span>
+              <div className="flex justify-between items-center p-3 bg-purple-50 rounded">
+                <span className="text-gray-700">Top Item</span>
+                <span className="font-bold text-purple-600">{analytics.topItems[0]?.name || 'N/A'}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Recent Orders Table */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-900">Recent Orders</h2>
-            <button 
-              onClick={exportToCSV}
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm flex items-center gap-2"
-            >
-              📊 Export CSV
-            </button>
+            <button onClick={exportToCSV} className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm flex items-center gap-2">📊 Export CSV</button>
           </div>
-          {orders.length === 0 ? (
-            <div className="p-8 text-center text-gray-600">No orders for your shop yet.</div>
+          {orders.length === 0 ? (            <div className="p-8 text-center text-gray-600">No orders for your shop yet.</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
@@ -333,15 +311,14 @@ export default function Dashboard() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(order.created_id).toLocaleString()}</td>
                       <td className="px-6 py-4 text-sm text-gray-900">
                         <ul className="list-disc list-inside">
-                          {Array.isArray(order.items) ? order.items.map((item: string, idx: number) => <li key={idx}>{item}</li>) : <li>{order.items}</li>}
+                          {Array.isArray(order.items) ? order.items.map((item: any, idx: number) => <li key={idx}>{item.name} (Rs.{item.price})</li>) : <li>{order.items}</li>}
                         </ul>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">{order.address}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.phone}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>
-                          {order.status}
-                        </span>                      </td>
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>{order.status}</span>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         {order.status === 'pending' && <button onClick={() => updateStatus(order.id, 'accepted')} className="text-blue-600 hover:text-blue-900 mr-3">Accept</button>}
                         {order.status === 'accepted' && <button onClick={() => updateStatus(order.id, 'delivered')} className="text-green-600 hover:text-green-900">Mark Delivered</button>}
