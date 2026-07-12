@@ -41,7 +41,7 @@ export async function POST(request) {
     let subtotal = 0;
     let gstTotal = 0;
     
-    items.forEach((item: any, idx: number) => {
+    items.forEach((item, idx) => {
       const price = item.price || 500;
       const gstRate = item.gst_rate || 18;
       const gst = price * gstRate / 100;
