@@ -8,7 +8,17 @@ function parseItems(items) {
   if (Array.isArray(items)) {
     return items.map(item => {
       if (typeof item === 'string') {
-        return { name: item, price: 500, gst_rate: 18 };
+        // String ko parse karo
+        try {
+          const parsed = JSON.parse(item);
+          return {
+            name: String(parsed.name || 'Unknown Item'),
+            price: Number(parsed.price) || 500,
+            gst_rate: Number(parsed.gst_rate) || 18
+          };
+        } catch (e) {
+          return { name: item, price: 500, gst_rate: 18 };
+        }
       } else if (typeof item === 'object' && item !== null) {
         return {
           name: String(item.name || 'Unknown Item'),
@@ -20,15 +30,23 @@ function parseItems(items) {
     });
   }
   
-  // Agar items string hai (JSON)
+  // Agar items string hai
   if (typeof items === 'string') {
     try {
       const parsed = JSON.parse(items);
       if (Array.isArray(parsed)) {
         return parsed.map(item => {
           if (typeof item === 'string') {
-            return { name: item, price: 500, gst_rate: 18 };
-          } else if (typeof item === 'object' && item !== null) {
+            try {
+              const parsedItem = JSON.parse(item);
+              return {
+                name: String(parsedItem.name || 'Unknown Item'),
+                price: Number(parsedItem.price) || 500,
+                gst_rate: Number(parsedItem.gst_rate) || 18
+              };
+            } catch (e) {
+              return { name: item, price: 500, gst_rate: 18 };
+            }          } else if (typeof item === 'object' && item !== null) {
             return {
               name: String(item.name || 'Unknown Item'),
               price: Number(item.price) || 500,
@@ -46,7 +64,8 @@ function parseItems(items) {
   return [{ name: 'Unknown Item', price: 500, gst_rate: 18 }];
 }
 
-export async function POST(request) {  try {
+export async function POST(request) {
+  try {
     const { order } = await request.json();
     
     const pdfDoc = await PDFDocument.create();
@@ -76,8 +95,7 @@ export async function POST(request) {  try {
     page.drawText('#', { x: 60, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
     page.drawText('Item', { x: 100, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
     page.drawText('Price', { x: 320, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
-    page.drawText('GST%', { x: 400, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
-    page.drawText('Total', { x: 470, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
+    page.drawText('GST%', { x: 400, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });    page.drawText('Total', { x: 470, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
     
     // Parse items properly
     const items = parseItems(order.items);
@@ -95,7 +113,8 @@ export async function POST(request) {  try {
       gstTotal += gst;
       
       if (idx % 2 === 0) {
-        page.drawRectangle({ x: 50, y: y - 5, width: 495, height: 25, color: rgb(0.95, 0.96, 0.97) });      }
+        page.drawRectangle({ x: 50, y: y - 5, width: 495, height: 25, color: rgb(0.95, 0.96, 0.97) });
+      }
       
       page.drawText(String(idx + 1), { x: 60, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
       page.drawText(item.name, { x: 100, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
@@ -125,8 +144,7 @@ export async function POST(request) {  try {
     // Footer
     page.drawText('Thank you for shopping with us!', { x: width / 2 - 100, y: 60, size: 10, font: font, color: rgb(0.42, 0.45, 0.5) });
     page.drawText('For any queries, contact us.', { x: width / 2 - 80, y: 40, size: 10, font: font, color: rgb(0.42, 0.45, 0.5) });
-    
-    const pdfBytes = await pdfDoc.save();
+        const pdfBytes = await pdfDoc.save();
     const pdfBase64 = Buffer.from(pdfBytes).toString('base64');
     
     return NextResponse.json({ success: true, pdf: pdfBase64, filename: 'invoice-' + order.id + '.pdf' });
