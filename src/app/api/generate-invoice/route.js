@@ -35,45 +35,35 @@ export async function POST(request) {
     page.drawText('GST%', { x: 400, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
     page.drawText('Total', { x: 470, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
     
-    // Items ko properly parse karo
+    // Items ko properly parse karo - text[] array from PostgreSQL
     let itemsArray = [];
     
     if (order.items) {
-      // Agar items string hai toh parse karo
-      let parsedItems;
-      if (typeof order.items === 'string') {
-        try {
-          parsedItems = JSON.parse(order.items);
-        } catch (e) {
-          parsedItems = [order.items];
-        }      } else {
-        parsedItems = order.items;
-      }
+      // text[] array hai - har element ek JSON string hai
+      const rawItems = Array.isArray(order.items) ? order.items : [order.items];
       
-      // Array mein convert karo
-      if (Array.isArray(parsedItems)) {
-        itemsArray = parsedItems.map(item => {
-          if (typeof item === 'string') {
-            try {
-              const parsed = JSON.parse(item);
-              return {
-                name: String(parsed.name || 'Item'),
-                price: Number(parsed.price) || 500,
-                gst_rate: Number(parsed.gst_rate) || 18
-              };
-            } catch (e) {
-              return { name: item, price: 500, gst_rate: 18 };
-            }
-          } else if (typeof item === 'object' && item !== null) {
-            return {
-              name: String(item.name || 'Item'),
-              price: Number(item.price) || 500,
-              gst_rate: Number(item.gst_rate) || 18
+      itemsArray = rawItems.map(item => {
+        if (typeof item === 'string') {
+          // Try to parse as JSON
+          try {
+            const parsed = JSON.parse(item);            return {
+              name: String(parsed.name || 'Item'),
+              price: Number(parsed.price) || 500,
+              gst_rate: Number(parsed.gst_rate) || 18
             };
+          } catch (e) {
+            // Not JSON, just a plain string (old format)
+            return { name: item, price: 500, gst_rate: 18 };
           }
-          return { name: 'Item', price: 500, gst_rate: 18 };
-        });
-      }
+        } else if (typeof item === 'object' && item !== null) {
+          return {
+            name: String(item.name || 'Item'),
+            price: Number(item.price) || 500,
+            gst_rate: Number(item.gst_rate) || 18
+          };
+        }
+        return { name: 'Item', price: 500, gst_rate: 18 };
+      });
     }
     
     let y = tableTop - 30;
@@ -95,7 +85,8 @@ export async function POST(request) {
       page.drawText(String(idx + 1), { x: 60, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
       page.drawText(item.name, { x: 100, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
       page.drawText('Rs.' + price, { x: 320, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
-      page.drawText(gstRate + '%', { x: 400, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });      page.drawText('Rs.' + itemTotal.toFixed(2), { x: 470, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
+      page.drawText(gstRate + '%', { x: 400, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
+      page.drawText('Rs.' + itemTotal.toFixed(2), { x: 470, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
       
       y -= 30;
     });
@@ -104,8 +95,7 @@ export async function POST(request) {
     y -= 10;
     page.drawLine({ start: { x: 50, y: y }, end: { x: 545, y: y }, thickness: 1, color: rgb(0.8, 0.8, 0.8) });
     
-    y -= 20;
-    page.drawText('Subtotal:', { x: 350, y: y, size: 11, font: font, color: rgb(0.3, 0.35, 0.4) });
+    y -= 20;    page.drawText('Subtotal:', { x: 350, y: y, size: 11, font: font, color: rgb(0.3, 0.35, 0.4) });
     page.drawText('Rs.' + subtotal, { x: 470, y: y, size: 11, font: font, color: rgb(0.3, 0.35, 0.4) });
     
     y -= 20;

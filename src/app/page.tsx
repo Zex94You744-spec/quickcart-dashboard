@@ -6,6 +6,32 @@ import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Cart
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
+function parseItems(items: any) {
+  if (!items) return [];
+  const rawItems = Array.isArray(items) ? items : [items];
+  return rawItems.map(item => {
+    if (typeof item === 'string') {
+      try {
+        const parsed = JSON.parse(item);
+        return {
+          name: String(parsed.name || 'Item'),
+          price: Number(parsed.price) || 500,
+          gst_rate: Number(parsed.gst_rate) || 18
+        };
+      } catch (e) {
+        return { name: item, price: 500, gst_rate: 18 };
+      }
+    } else if (typeof item === 'object' && item !== null) {
+      return {
+        name: String(item.name || 'Item'),
+        price: Number(item.price) || 500,
+        gst_rate: Number(item.gst_rate) || 18
+      };
+    }
+    return { name: 'Item', price: 500, gst_rate: 18 };
+  });
+}
+
 export default function Dashboard() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,8 +46,7 @@ export default function Dashboard() {
   const router = useRouter();
 
   useEffect(() => {
-    checkAuth();
-  }, []);
+    checkAuth();  }, []);
 
   async function checkAuth() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -43,39 +68,13 @@ export default function Dashboard() {
   async function fetchOrders(sId: string) {
     const { data, error } = await supabase.from('orders').select('*').eq('shop_id', sId).order('created_id', { ascending: false });
     if (data) { 
-      // Parse items for each order
       const parsedOrders = data.map(order => ({
         ...order,
-        items: parseItems(order.items)      }));
+        items: parseItems(order.items)
+      }));
       setOrders(parsedOrders); 
       calculateAnalytics(parsedOrders);
       setLoading(false); 
-    }
-  }
-
-  function parseItems(items: any) {
-    if (!items) return [];
-    if (Array.isArray(items)) {
-      return items.map(item => {
-        if (typeof item === 'string') {
-          return { name: item, price: 500, gst_rate: 18 };
-        }
-        return item;
-      });
-    }
-    try {
-      const parsed = JSON.parse(items);
-      if (Array.isArray(parsed)) {
-        return parsed.map(item => {
-          if (typeof item === 'string') {
-            return { name: item, price: 500, gst_rate: 18 };
-          }
-          return item;
-        });
-      }
-      return [parsed];
-    } catch (e) {
-      return [{ name: items, price: 500, gst_rate: 18 }];
     }
   }
 
@@ -95,8 +94,8 @@ export default function Dashboard() {
       });
     });
     
-    const last7Days = Array.from({ length: 7 }, (_, i) => {      const d = new Date();
-      d.setDate(d.getDate() - (6 - i));
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();      d.setDate(d.getDate() - (6 - i));
       return d.toLocaleDateString('en-US', { weekday: 'short' });
     });
     
@@ -144,8 +143,8 @@ export default function Dashboard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ order })
-      });      const data = await response.json();
-      if (data.success) {
+      });
+      const data = await response.json();      if (data.success) {
         await fetch('/api/send-invoice', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -193,8 +192,8 @@ export default function Dashboard() {
         `"${order.address.replace(/"/g, '""')}"`,
         order.phone,
         order.status,
-        subtotal,        gstTotal.toFixed(2),
-        total.toFixed(2)
+        subtotal,
+        gstTotal.toFixed(2),        total.toFixed(2)
       ].join(',');
     });
 
@@ -242,8 +241,8 @@ export default function Dashboard() {
           </div>
           <div className="bg-white rounded-lg shadow p-6">
             <div className="text-sm text-gray-600">Total Revenue</div>
-            <div className="text-3xl font-bold text-green-600 mt-2">₹{analytics.totalRevenue}</div>          </div>
-          <div className="bg-white rounded-lg shadow p-6">
+            <div className="text-3xl font-bold text-green-600 mt-2">₹{analytics.totalRevenue}</div>
+          </div>          <div className="bg-white rounded-lg shadow p-6">
             <div className="text-sm text-gray-600">Pending</div>
             <div className="text-3xl font-bold text-yellow-600 mt-2">{orders.filter(o => o.status === 'pending').length}</div>
           </div>
@@ -269,7 +268,7 @@ export default function Dashboard() {
           </div>
 
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4"> Top Selling Items</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">🏆 Top Selling Items</h2>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={analytics.topItems}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -283,7 +282,7 @@ export default function Dashboard() {
           </div>
 
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4"> Order Status Distribution</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">📊 Order Status Distribution</h2>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie data={analytics.statusData} cx="50%" cy="50%" labelLine={false} label={({ name, value }) => `${name}: ${value}`} outerRadius={100} fill="#8884d8" dataKey="value">
@@ -291,8 +290,8 @@ export default function Dashboard() {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />              </PieChart>
-            </ResponsiveContainer>
+                <Tooltip />
+              </PieChart>            </ResponsiveContainer>
           </div>
 
           <div className="bg-white rounded-lg shadow p-6">
@@ -340,8 +339,8 @@ export default function Dashboard() {
                   {orders.map((order: any) => (
                     <tr key={order.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(order.created_id).toLocaleString()}</td>
-                      <td className="px-6 py-4 text-sm text-gray-900">                        <ul className="list-disc list-inside">
-                          {Array.isArray(order.items) ? order.items.map((item: any, idx: number) => <li key={idx}>{item.name} (Rs.{item.price})</li>) : <li>{order.items}</li>}
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        <ul className="list-disc list-inside">                          {Array.isArray(order.items) ? order.items.map((item: any, idx: number) => <li key={idx}>{item.name} (Rs.{item.price})</li>) : <li>{order.items}</li>}
                         </ul>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">{order.address}</td>
