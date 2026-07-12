@@ -5,13 +5,35 @@ export default function LandingPage() {
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({ name: '', shopName: '', phone: '', email: '' });
 
-  const handleSignup = (e: any) => {
+  const handleSignup = async (e: any) => {
     e.preventDefault();
-    // Yahan backend integration karenge baad mein
-    alert('Thank you! Hum aapse jaldi contact karenge.');
-    setShowModal(false);
-  };
+  
+    try {
+      const response = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          shopName: formData.shopName,
+          phone: formData.phone,
+          email: formData.email
+      })
+    });
 
+    const result = await response.json();
+
+      if (result.success) {
+        alert(' Congratulations!\n\nAapka 7-day free trial activate ho gaya hai!\n\nHum aapse jaldi contact karenge.\n\nTrial End Date: ' + new Date(Date.now() + 7*24*60*60*1000).toLocaleDateString('en-IN'));
+        setShowModal(false);
+        setFormData({ name: '', shopName: '', phone: '', email: '' });
+      } else {
+        alert('Error: ' + result.error);
+      }
+    } catch (error) {
+      alert('Something went wrong. Please try again.');
+      console.error('Signup error:', error);
+    }
+  };
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
