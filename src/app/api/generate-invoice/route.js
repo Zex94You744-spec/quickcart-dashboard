@@ -1,69 +1,6 @@
 import { NextResponse } from 'next/server';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
-function parseItems(items) {
-  if (!items) return [];
-  
-  // Agar items already array hai
-  if (Array.isArray(items)) {
-    return items.map(item => {
-      if (typeof item === 'string') {
-        // String ko parse karo
-        try {
-          const parsed = JSON.parse(item);
-          return {
-            name: String(parsed.name || 'Unknown Item'),
-            price: Number(parsed.price) || 500,
-            gst_rate: Number(parsed.gst_rate) || 18
-          };
-        } catch (e) {
-          return { name: item, price: 500, gst_rate: 18 };
-        }
-      } else if (typeof item === 'object' && item !== null) {
-        return {
-          name: String(item.name || 'Unknown Item'),
-          price: Number(item.price) || 500,
-          gst_rate: Number(item.gst_rate) || 18
-        };
-      }
-      return { name: 'Unknown Item', price: 500, gst_rate: 18 };
-    });
-  }
-  
-  // Agar items string hai
-  if (typeof items === 'string') {
-    try {
-      const parsed = JSON.parse(items);
-      if (Array.isArray(parsed)) {
-        return parsed.map(item => {
-          if (typeof item === 'string') {
-            try {
-              const parsedItem = JSON.parse(item);
-              return {
-                name: String(parsedItem.name || 'Unknown Item'),
-                price: Number(parsedItem.price) || 500,
-                gst_rate: Number(parsedItem.gst_rate) || 18
-              };
-            } catch (e) {
-              return { name: item, price: 500, gst_rate: 18 };
-            }          } else if (typeof item === 'object' && item !== null) {
-            return {
-              name: String(item.name || 'Unknown Item'),
-              price: Number(item.price) || 500,
-              gst_rate: Number(item.gst_rate) || 18
-            };
-          }
-          return { name: 'Unknown Item', price: 500, gst_rate: 18 };
-        });
-      }
-    } catch (e) {
-      return [{ name: items, price: 500, gst_rate: 18 }];
-    }
-  }
-  
-  return [{ name: 'Unknown Item', price: 500, gst_rate: 18 }];
-}
-
 export async function POST(request) {
   try {
     const { order } = await request.json();
@@ -95,16 +32,55 @@ export async function POST(request) {
     page.drawText('#', { x: 60, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
     page.drawText('Item', { x: 100, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
     page.drawText('Price', { x: 320, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
-    page.drawText('GST%', { x: 400, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });    page.drawText('Total', { x: 470, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
+    page.drawText('GST%', { x: 400, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
+    page.drawText('Total', { x: 470, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
     
-    // Parse items properly
-    const items = parseItems(order.items);
+    // Items ko properly parse karo
+    let itemsArray = [];
+    
+    if (order.items) {
+      // Agar items string hai toh parse karo
+      let parsedItems;
+      if (typeof order.items === 'string') {
+        try {
+          parsedItems = JSON.parse(order.items);
+        } catch (e) {
+          parsedItems = [order.items];
+        }      } else {
+        parsedItems = order.items;
+      }
+      
+      // Array mein convert karo
+      if (Array.isArray(parsedItems)) {
+        itemsArray = parsedItems.map(item => {
+          if (typeof item === 'string') {
+            try {
+              const parsed = JSON.parse(item);
+              return {
+                name: String(parsed.name || 'Item'),
+                price: Number(parsed.price) || 500,
+                gst_rate: Number(parsed.gst_rate) || 18
+              };
+            } catch (e) {
+              return { name: item, price: 500, gst_rate: 18 };
+            }
+          } else if (typeof item === 'object' && item !== null) {
+            return {
+              name: String(item.name || 'Item'),
+              price: Number(item.price) || 500,
+              gst_rate: Number(item.gst_rate) || 18
+            };
+          }
+          return { name: 'Item', price: 500, gst_rate: 18 };
+        });
+      }
+    }
     
     let y = tableTop - 30;
     let subtotal = 0;
     let gstTotal = 0;
     
-    items.forEach((item, idx) => {
+    itemsArray.forEach((item, idx) => {
       const price = item.price;
       const gstRate = item.gst_rate;
       const gst = price * gstRate / 100;
@@ -119,8 +95,7 @@ export async function POST(request) {
       page.drawText(String(idx + 1), { x: 60, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
       page.drawText(item.name, { x: 100, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
       page.drawText('Rs.' + price, { x: 320, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
-      page.drawText(gstRate + '%', { x: 400, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
-      page.drawText('Rs.' + itemTotal.toFixed(2), { x: 470, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
+      page.drawText(gstRate + '%', { x: 400, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });      page.drawText('Rs.' + itemTotal.toFixed(2), { x: 470, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
       
       y -= 30;
     });
@@ -144,7 +119,8 @@ export async function POST(request) {
     // Footer
     page.drawText('Thank you for shopping with us!', { x: width / 2 - 100, y: 60, size: 10, font: font, color: rgb(0.42, 0.45, 0.5) });
     page.drawText('For any queries, contact us.', { x: width / 2 - 80, y: 40, size: 10, font: font, color: rgb(0.42, 0.45, 0.5) });
-        const pdfBytes = await pdfDoc.save();
+    
+    const pdfBytes = await pdfDoc.save();
     const pdfBase64 = Buffer.from(pdfBytes).toString('base64');
     
     return NextResponse.json({ success: true, pdf: pdfBase64, filename: 'invoice-' + order.id + '.pdf' });
