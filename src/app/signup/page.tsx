@@ -4,7 +4,13 @@ import { useState } from 'react';
 export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [formData, setFormData] = useState({ name: '', shopName: '', phone: '', email: '' });
+  const [formData, setFormData] = useState({ 
+    name: '', 
+    shopName: '', 
+    phone: '', 
+    email: '', 
+    plan: 'pro' 
+  });
 
   const handleSignup = async (e: any) => {
     e.preventDefault();
@@ -14,7 +20,13 @@ export default function SignupPage() {
       const response = await fetch('/api/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          name: formData.name,
+          shopName: formData.shopName,
+          phone: formData.phone,
+          email: formData.email,
+          plan: formData.plan
+        })
       });
 
       const result = await response.json();
@@ -35,8 +47,7 @@ export default function SignupPage() {
   if (success) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
-          <div className="text-6xl mb-4">🎉</div>
+        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">          <div className="text-6xl mb-4">🎉</div>
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Congratulations!</h1>
           <p className="text-lg text-gray-600 mb-6">
             Aapka <span className="font-bold text-blue-600">7-day free trial</span> activate ho gaya hai!
@@ -47,7 +58,9 @@ export default function SignupPage() {
               <li>✓ Hum aapse 24 ghante mein contact karenge</li>
               <li>✓ Aapka custom Telegram bot setup hoga</li>
               <li>✓ Dashboard access mil jayega</li>
-            </ul>          </div>
+              <li>✓ Pehla mahina 50% discount milega</li>
+            </ul>
+          </div>
           <a 
             href="/landing"
             className="block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold"
@@ -83,8 +96,7 @@ export default function SignupPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Shop Ka Naam *</label>
             <input 
               type="text" 
-              required
-              value={formData.shopName}
+              required              value={formData.shopName}
               onChange={(e) => setFormData({...formData, shopName: e.target.value})}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
               placeholder="Rahul General Store"
@@ -96,7 +108,8 @@ export default function SignupPage() {
               type="tel" 
               required
               value={formData.phone}
-              onChange={(e) => setFormData({...formData, phone: e.target.value})}              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
+              onChange={(e) => setFormData({...formData, phone: e.target.value})}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
               placeholder="9876543210"
             />
           </div>
@@ -111,6 +124,20 @@ export default function SignupPage() {
               placeholder="rahul@example.com"
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Choose Plan *</label>
+            <select
+              required
+              value={formData.plan}
+              onChange={(e) => setFormData({...formData, plan: e.target.value})}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
+            >
+              <option value="starter">Starter - ₹499/month</option>
+              <option value="pro">Pro - ₹999/month (Most Popular)</option>
+              <option value="premium">Premium - ₹1999/month</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">🎁 Pehla mahina 50% OFF!</p>
+          </div>
 
           <button 
             type="submit"
@@ -119,7 +146,6 @@ export default function SignupPage() {
           >
             {loading ? 'Processing...' : '🚀 Start 7-Day Free Trial'}
           </button>
-
           <a 
             href="/landing"
             className="block text-center text-gray-600 hover:text-gray-900 mt-4"

@@ -47,6 +47,27 @@ export async function POST(request) {
       );
     }
 
+    const { name, shopName, phone, email, plan } = await request.json();
+
+    // ... validation ...
+
+    const { data, error } = await supabase
+      .from('leads')
+      .insert([
+        {
+          name,
+          shop_name: shopName,
+          phone,
+          email,
+          subscription_plan: plan || 'pro',
+          subscription_status: 'trial',
+          trial_start_date: trialStartDate.toISOString(),
+          trial_end_date: trialEndDate.toISOString(),
+          status: 'new'
+        }
+      ])
+      .select();
+
     // Admin ko notification bhejo (Telegram pe)
     const adminChatId = process.env.ADMIN_CHAT_ID;
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
