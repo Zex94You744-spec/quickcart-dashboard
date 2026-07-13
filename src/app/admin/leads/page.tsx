@@ -1,6 +1,4 @@
 'use client';
-export const dynamic = 'force-dynamic';
-
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
@@ -43,21 +41,18 @@ export default function AdminLeadsPage() {
   }, []);
 
   async function fetchData() {
-    // Cache busting add kiya
     const { data, error } = await supabase
       .from('leads')
       .select('*')
       .order('created_at', { ascending: false });
 
     if (data) {
-      setLeads(data);
-      calculateStats(data);
+      setLeads(data);      calculateStats(data);
     }
     setLoading(false);
   }
 
   function calculateStats(data: Lead[]) {
-    const now = new Date();
     const stats = {
       total: data.length,
       trial: data.filter(l => l.subscription_status === 'trial').length,
@@ -88,6 +83,35 @@ export default function AdminLeadsPage() {
     }
   }
 
+  async function handleSendPaymentLink(lead: Lead) {
+    const price = lead.subscription_status === 'discounted' 
+      ? PRICING[lead.subscription_plan || 'pro'].discounted 
+      : PRICING[lead.subscription_plan || 'pro'].regular;
+    
+    if (!confirm(`Send payment link to ${lead.name} for Rs.${price}?`)) return;
+    
+    try {
+      const response = await fetch('/api/payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: lead.id,
+          plan: lead.subscription_plan || 'pro'        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        alert(`✅ Payment link sent to ${lead.name}!\nAmount: Rs.${result.amount}\n\nLink sent via Telegram.`);
+      } else {
+        alert(' Error: ' + result.error);
+      }
+    } catch (error) {
+      alert(' Failed to send payment link');
+      console.error('Payment link error:', error);
+    }
+  }
+
   async function runSubscriptionCheck() {
     if (!confirm('Saari subscriptions check aur update karna hai?')) return;
     
@@ -100,7 +124,8 @@ export default function AdminLeadsPage() {
     const result = await response.json();
     if (result.success) {
       alert(`${result.updated} subscriptions update ho gayi!`);
-      fetchData();    }
+      fetchData();
+    }
   }
 
   function getSubscriptionBadge(lead: Lead) {
@@ -120,8 +145,7 @@ export default function AdminLeadsPage() {
           </div>
         </div>
       );
-    } else if (lead.subscription_status === 'discounted') {
-      const discountEnd = new Date(lead.discount_end_date);
+    } else if (lead.subscription_status === 'discounted') {      const discountEnd = new Date(lead.discount_end_date);
       const daysLeft = Math.ceil((discountEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       const price = PRICING[plan].discounted;
       return (
@@ -149,6 +173,7 @@ export default function AdminLeadsPage() {
     }
     return <span className="text-gray-500">—</span>;
   }
+
   function exportToCSV() {
     const headers = ['Name', 'Shop', 'Phone', 'Email', 'Status', 'Plan', 'Subscription', 'Price', 'Trial End', 'Discount End'];
     const rows = leads.map(lead => {
@@ -170,7 +195,6 @@ export default function AdminLeadsPage() {
         lead.discount_end_date ? new Date(lead.discount_end_date).toLocaleDateString('en-IN') : 'N/A'
       ];
     });
-
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -198,12 +222,13 @@ export default function AdminLeadsPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
             <p className="text-gray-600 mt-1">Manage leads, trials & subscriptions</p>
-          </div>          <div className="flex gap-3">
+          </div>
+          <div className="flex gap-3">
             <button 
               onClick={runSubscriptionCheck}
               className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600"
             >
-              🔄 Update Subscriptions
+               Update Subscriptions
             </button>
             <button 
               onClick={exportToCSV}
@@ -219,7 +244,6 @@ export default function AdminLeadsPage() {
             </a>
           </div>
         </div>
-
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow p-6">
@@ -247,7 +271,8 @@ export default function AdminLeadsPage() {
         {/* Filter Tabs */}
         <div className="bg-white rounded-lg shadow p-4 mb-6">
           <div className="flex gap-2 flex-wrap">
-            {[              { key: 'all', label: 'All' },
+            {[
+              { key: 'all', label: 'All' },
               { key: 'trial', label: 'Trial' },
               { key: 'discounted', label: 'Discounted' },
               { key: 'active', label: 'Active' }
@@ -267,8 +292,7 @@ export default function AdminLeadsPage() {
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">All Leads</h2>
-          </div>
-          {filteredLeads.length === 0 ? (
+          </div>          {filteredLeads.length === 0 ? (
             <div className="p-8 text-center text-gray-600">No leads found.</div>
           ) : (
             <div className="overflow-x-auto">
@@ -296,7 +320,8 @@ export default function AdminLeadsPage() {
                         <a href={`tel:${lead.phone}`} className="text-blue-600 hover:underline block">{lead.phone}</a>
                       </td>
                       <td className="px-6 py-4 text-sm">
-                        <select                          value={lead.subscription_plan || 'pro'}
+                        <select
+                          value={lead.subscription_plan || 'pro'}
                           onChange={(e) => {
                             supabase.from('leads').update({ subscription_plan: e.target.value }).eq('id', lead.id);
                             setLeads(leads.map(l => l.id === lead.id ? {...l, subscription_plan: e.target.value} : l));
@@ -316,18 +341,23 @@ export default function AdminLeadsPage() {
                           value={lead.status}
                           onChange={(e) => updateStatus(lead.id, e.target.value)}
                           className="border border-gray-300 rounded px-2 py-1 text-xs"
-                        >
-                          <option value="new">New</option>
+                        >                          <option value="new">New</option>
                           <option value="contacted">Contacted</option>
                           <option value="converted">Converted</option>
                           <option value="rejected">Rejected</option>
                         </select>
                       </td>
-                      <td className="px-6 py-4 text-sm">
+                      <td className="px-6 py-4 text-sm space-y-2">
+                        <button
+                          onClick={() => handleSendPaymentLink(lead)}
+                          className="text-blue-600 hover:text-blue-900 font-semibold block"
+                        >
+                          💳 Send Payment
+                        </button>
                         <a 
                           href={`https://wa.me/91${lead.phone}`}
                           target="_blank"
-                          className="text-green-600 hover:underline"
+                          className="text-green-600 hover:underline block"
                         >
                           💬 WhatsApp
                         </a>
