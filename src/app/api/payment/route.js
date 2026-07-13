@@ -84,7 +84,21 @@ export async function POST(request) {
     const adminChatId = process.env.ADMIN_CHAT_ID;
     
     // Chat ID: Pehle telegram_chat_id check karo, fallback ke liye admin ko bhej do
-    const chatId = lead.telegram_chat_id || adminChatId || '123456789';
+    const chatId = lead.telegram_chat_id || adminChatId;
+    
+    console.log('🔍 Debug Info:');
+    console.log('- lead.telegram_chat_id:', lead.telegram_chat_id);
+    console.log('- adminChatId from env:', adminChatId);
+    console.log('- Final chatId:', chatId);
+    console.log('- Bot Token exists:', !!botToken);
+
+    if (botToken && chatId) {
+      // ... existing message code ...
+    } else {
+      console.error('❌ Telegram notification skipped: Missing bot token or chat ID');
+      console.error('Bot Token:', botToken ? 'Exists' : 'MISSING');
+      console.error('Chat ID:', chatId || 'MISSING');
+    }
 
     if (botToken && chatId) {
       // HTML parse mode use karte hain aur user input ko escape karte hain taaki error na aaye
