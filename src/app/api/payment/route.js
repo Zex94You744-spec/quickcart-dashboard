@@ -17,6 +17,17 @@ function getPrice(plan, priceType) {
   return planPricing[priceType];
 }
 
+// Helper function to escape HTML special characters
+function escapeHtml(text) {
+  if (!text) return '';
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 export async function POST(request) {
   try {
     const { leadId, plan } = await request.json();
@@ -33,13 +44,12 @@ export async function POST(request) {
     const { createClient } = await import('@supabase/supabase-js');
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    const { data: lead } = await supabase
+    const { data: lead, error: leadError } = await supabase
       .from('leads')
       .select('*')
-      .eq('id', leadId)
-      .single();
+      .eq('id', leadId)      .single();
 
-    if (!lead) {
+    if (leadError || !lead) {
       return NextResponse.json(
         { success: false, error: 'Lead not found' },
         { status: 404 }
@@ -50,11 +60,12 @@ export async function POST(request) {
     const price = getPrice(plan, isDiscounted ? 'discounted' : 'regular');
     const planName = plan.charAt(0).toUpperCase() + plan.slice(1);
     
-    // Receipt ko short bana (max 40 chars)
+    // Receipt ko short bana (Razorpay max 40 chars allow karta hai)
     const receipt = `qc_${Date.now()}`;
     
+    // Razorpay Order Create Kar
     const payment = await razorpay.orders.create({
-      amount: price * 100,
+      amount: price * 100, // Amount in paise
       currency: 'INR',
       receipt: receipt,
       notes: {
@@ -68,34 +79,55 @@ export async function POST(request) {
 
     const paymentUrl = payment.short_url || `https://razorpay.com/order/${payment.id}`;
 
+    // Telegram Notification Bhejo
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
-
-// Chat ID kaise milega
-const chatId = lead.telegram_chat_id || lead.phone;
-
-if (botToken && chatId) {
-  const message = `💳 *Payment Link - QuickCart*\n\n👤 Name: ${lead.name}\n Shop: ${lead.shop_name}\n\n💰 Plan: ${planName} ${isDiscounted ? '(50% OFF Applied!)' : ''}\n Amount: Rs.${price}\n\n🔗 Payment Link: ${paymentUrl}\n\n⏰ Valid for 24 hours\n\nThank you for choosing QuickCart! `;
-  
-  try {
-    const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: 'Markdown'
-      })
-    });
+    const adminChatId = process.env.ADMIN_CHAT_ID;
     
-    const telegramResult = await telegramResponse.json();
-    
-    if (!telegramResult.ok) {
-      console.error('Telegram Error:', telegramResult);
+    // Chat ID: Pehle telegram_chat_id check karo, fallback ke liye admin ko bhej do
+    const chatId = lead.telegram_chat_id || adminChatId;
+
+    if (botToken && chatId) {
+      // HTML parse mode use karte hain aur user input ko escape karte hain taaki error na aaye
+      const safeName = escapeHtml(lead.name);
+      const safeShop = escapeHtml(lead.shop_name);
+      const discountText = isDiscounted ? '<b>(50% OFF Applied!)</b>' : '';
+      
+      const message = `💳 <b>Payment Link - QuickCart</b>
+
+👤 Name: ${safeName}
+🏪 Shop: ${safeShop}
+💰 Plan: ${planName} ${discountText}
+💸 Amount: Rs.${price}
+
+🔗 <a href="${paymentUrl}">Click Here to Pay Securely</a>
+
+⏰ Valid for 24 hours
+
+Thank you for choosing QuickCart!`;
+
+      try {
+        const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: message,
+            parse_mode: 'HTML',
+            disable_web_page_preview: true
+          })
+        });
+        
+        const telegramResult = await telegramResponse.json();
+        
+        if (!telegramResult.ok) {
+          console.error('Telegram Error Details:', telegramResult);
+        }
+      } catch (error) {
+        console.error('Telegram notification failed:', error);
+      }
+    } else {
+      console.warn('Telegram Bot Token or Chat ID missing. Notification skipped.');
     }
-  } catch (error) {
-    console.error('Telegram notification failed:', error);
-  }
-}
 
     return NextResponse.json({ 
       success: true, 
