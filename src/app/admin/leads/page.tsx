@@ -1,4 +1,6 @@
 'use client';
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
@@ -41,13 +43,15 @@ export default function AdminLeadsPage() {
   }, []);
 
   async function fetchData() {
+    // Cache busting add kiya
     const { data, error } = await supabase
       .from('leads')
       .select('*')
       .order('created_at', { ascending: false });
 
     if (data) {
-      setLeads(data);      calculateStats(data);
+      setLeads(data);
+      calculateStats(data);
     }
     setLoading(false);
   }
