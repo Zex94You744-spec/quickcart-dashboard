@@ -69,19 +69,33 @@ export async function POST(request) {
     const paymentUrl = payment.short_url || `https://razorpay.com/order/${payment.id}`;
 
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    if (botToken && lead.phone) {
-      const message = `💳 *Payment Link - QuickCart*\n\n👤 Name: ${lead.name}\n🏪 Shop: ${lead.shop_name}\n\n💰 Plan: ${planName} ${isDiscounted ? '(50% OFF Applied!)' : ''}\n💸 Amount: Rs.${price}\n\n🔗 Payment Link: ${paymentUrl}\n\n⏰ Valid for 24 hours\n\nThank you for choosing QuickCart! `;
-      
-      await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: lead.phone,
-          text: message,
-          parse_mode: 'Markdown'
-        })
-      }).catch(e => console.error('Telegram notification failed:', e));
+
+// Chat ID kaise milega
+const chatId = lead.telegram_chat_id || lead.phone;
+
+if (botToken && chatId) {
+  const message = `💳 *Payment Link - QuickCart*\n\n👤 Name: ${lead.name}\n Shop: ${lead.shop_name}\n\n💰 Plan: ${planName} ${isDiscounted ? '(50% OFF Applied!)' : ''}\n Amount: Rs.${price}\n\n🔗 Payment Link: ${paymentUrl}\n\n⏰ Valid for 24 hours\n\nThank you for choosing QuickCart! `;
+  
+  try {
+    const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'Markdown'
+      })
+    });
+    
+    const telegramResult = await telegramResponse.json();
+    
+    if (!telegramResult.ok) {
+      console.error('Telegram Error:', telegramResult);
     }
+  } catch (error) {
+    console.error('Telegram notification failed:', error);
+  }
+}
 
     return NextResponse.json({ 
       success: true, 
