@@ -84,9 +84,10 @@ export default function AdminLeadsPage() {
   }
 
   async function handleSendPaymentLink(lead: Lead) {
+    const plan = lead.subscription_plan || 'pro';
     const price = lead.subscription_status === 'discounted' 
-      ? PRICING[lead.subscription_plan || 'pro'].discounted 
-      : PRICING[lead.subscription_plan || 'pro'].regular;
+      ? PRICING[plan]?.discounted || 499
+      : PRICING[plan]?.regular || 999;
     
     if (!confirm(`Send payment link to ${lead.name} for Rs.${price}?`)) return;
     
@@ -96,19 +97,20 @@ export default function AdminLeadsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           leadId: lead.id,
-          plan: lead.subscription_plan || 'pro'        })
+          plan: plan
+        })
       });
       
       const result = await response.json();
       
       if (result.success) {
-        alert(`✅ Payment link sent to ${lead.name}!\nAmount: Rs.${result.amount}\n\nLink sent via Telegram.`);
+        alert(`✅ Payment link sent to ${lead.name}!\nAmount: Rs.${result.amount || price}\n\nCheck Telegram for link.`);
       } else {
-        alert(' Error: ' + result.error);
+        alert('Error: ' + (result.error || 'Failed to create payment link'));
       }
     } catch (error) {
-      alert(' Failed to send payment link');
       console.error('Payment link error:', error);
+      alert('Failed to send payment link. Please check console for details.');
     }
   }
 

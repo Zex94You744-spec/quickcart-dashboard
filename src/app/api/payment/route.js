@@ -12,6 +12,11 @@ const PRICING = {
   premium: { regular: 1999, discounted: 999 }
 };
 
+function getPrice(plan, priceType) {
+  const planPricing = PRICING[plan] || PRICING.pro;
+  return planPricing[priceType];
+}
+
 export async function POST(request) {
   try {
     const { leadId, plan } = await request.json();
@@ -23,7 +28,6 @@ export async function POST(request) {
       );
     }
 
-    // Lead details fetch kar
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     const { createClient } = await import('@supabase/supabase-js');
@@ -42,16 +46,17 @@ export async function POST(request) {
       );
     }
 
-    // Price calculate kar
     const isDiscounted = lead.subscription_status === 'discounted';
-    const price = isDiscounted ? PRICING[plan].discounted : PRICING[plan].regular;
+    const price = getPrice(plan, isDiscounted ? 'discounted' : 'regular');
     const planName = plan.charAt(0).toUpperCase() + plan.slice(1);
     
-    // Payment link create kar
+    // Receipt ko short bana (max 40 chars)
+    const receipt = `qc_${Date.now()}`;
+    
     const payment = await razorpay.orders.create({
-      amount: price * 100, // Amount in paise
+      amount: price * 100,
       currency: 'INR',
-      receipt: `quickcart_${lead.id}_${Date.now()}`,
+      receipt: receipt,
       notes: {
         lead_id: lead.id,
         lead_name: lead.name,
@@ -61,13 +66,11 @@ export async function POST(request) {
       }
     });
 
-    // Payment link URL
     const paymentUrl = payment.short_url || `https://razorpay.com/order/${payment.id}`;
 
-    // Customer ko Telegram pe payment link bhejo
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     if (botToken && lead.phone) {
-      const message = `💳 *Payment Link - QuickCart*\n\n👤 Name: ${lead.name}\n🏪 Shop: ${lead.shop_name}\n\n💰 Plan: ${planName} ${isDiscounted ? '(50% OFF Applied!)' : ''}\n Amount: Rs.${price}\n\n Payment Link: ${paymentUrl}\n\n⏰ Valid for 24 hours\n\nThank you for choosing QuickCart! `;
+      const message = `💳 *Payment Link - QuickCart*\n\n👤 Name: ${lead.name}\n🏪 Shop: ${lead.shop_name}\n\n💰 Plan: ${planName} ${isDiscounted ? '(50% OFF Applied!)' : ''}\n💸 Amount: Rs.${price}\n\n🔗 Payment Link: ${paymentUrl}\n\n⏰ Valid for 24 hours\n\nThank you for choosing QuickCart! `;
       
       await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         method: 'POST',
