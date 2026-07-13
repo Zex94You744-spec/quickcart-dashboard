@@ -6,7 +6,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const PRICING = {
+const PRICING: Record<string, { regular: number; discounted: number }> = {
   starter: { regular: 499, discounted: 249 },
   pro: { regular: 999, discounted: 499 },
   premium: { regular: 1999, discounted: 999 }

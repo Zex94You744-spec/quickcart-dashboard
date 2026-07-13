@@ -12,9 +12,15 @@ const PRICING = {
   premium: { regular: 1999, discounted: 999 }
 };
 
+// Helper function to get pricing safely
+function getPrice(plan, priceType) {
+  const planPricing = PRICING[plan] || PRICING.pro;
+  return planPricing[priceType];
+}
+
 export async function POST(request) {
   try {
-    const { action, leadId } = await request.json();
+    const { action, leadId, plan } = await request.json();
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     const adminChatId = process.env.ADMIN_CHAT_ID;
 
@@ -41,13 +47,13 @@ export async function POST(request) {
             discount_start_date: discountStart.toISOString(),
             discount_end_date: discountEnd.toISOString()
           }).eq('id', lead.id);
-
           // Customer ko notification bhejo
           if (botToken && lead.phone) {
-            const plan = lead.subscription_plan || 'pro';
-            const price = PRICING[plan].discounted;
-            const message = `🎉 *Congratulations ${lead.name}!*\n\nAapka 7-day free trial complete ho gaya hai!\n\n🎁 *Special Offer Activated:*\nAapko pehle mahine ke liye *50% DISCOUNT* mila hai!\n\n💰 Plan: ${plan.toUpperCase()}\n💸 Price: ~~Rs.${PRICING[plan].regular}~~ *Rs.${price}*\n📅 Valid till: ${discountEnd.toLocaleDateString('en-IN')}\n\nPayment ke liye hum aapse jaldi contact karenge.`;
-                        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            const currentPlan = lead.subscription_plan || 'pro';
+            const price = getPrice(currentPlan, 'discounted');
+            const message = `🎉 *Congratulations ${lead.name}!*\n\nAapka 7-day free trial complete ho gaya hai!\n\n🎁 *Special Offer Activated:*\nAapko pehle mahine ke liye *50% DISCOUNT* mila hai!\n\n💰 Plan: ${currentPlan.toUpperCase()}\n💸 Price: ~~Rs.${getPrice(currentPlan, 'regular')}~~ *Rs.${price}*\n📅 Valid till: ${discountEnd.toLocaleDateString('en-IN')}\n\nPayment ke liye hum aapse jaldi contact karenge.`;
+            
+            await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ chat_id: lead.phone, text: message, parse_mode: 'Markdown' })
@@ -56,7 +62,8 @@ export async function POST(request) {
 
           // Admin ko notification
           if (botToken && adminChatId) {
-            const adminMsg = `🔄 TRIAL CONVERTED TO DISCOUNT\n\n👤 ${lead.name}\n🏪 ${lead.shop_name}\n📞 ${lead.phone}\n💰 Plan: ${lead.subscription_plan}\n💸 Discounted Price: Rs.${PRICING[lead.subscription_plan || 'pro'].discounted}\n📅 Discount till: ${discountEnd.toLocaleDateString('en-IN')}`;
+            const currentPlan = lead.subscription_plan || 'pro';
+            const adminMsg = `🔄 TRIAL CONVERTED TO DISCOUNT\n\n👤 ${lead.name}\n🏪 ${lead.shop_name}\n📞 ${lead.phone}\n💰 Plan: ${currentPlan}\n💸 Discounted Price: Rs.${getPrice(currentPlan, 'discounted')}\n📅 Discount till: ${discountEnd.toLocaleDateString('en-IN')}`;
             
             await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
               method: 'POST',
@@ -77,9 +84,9 @@ export async function POST(request) {
 
           // Customer ko notification
           if (botToken && lead.phone) {
-            const plan = lead.subscription_plan || 'pro';
-            const price = PRICING[plan].regular;
-            const message = `📢 *Dear ${lead.name}*\n\nAapka 50% discount period complete ho gaya hai.\n\nAb se aapka subscription regular price pe continue hoga:\n\n💰 Plan: ${plan.toUpperCase()}\n💸 Price: Rs.${price}/month\n\nKoi bhi query ho toh humse contact karein.\n\nThank you for being with QuickCart! 🙏`;
+            const currentPlan = lead.subscription_plan || 'pro';
+            const price = getPrice(currentPlan, 'regular');
+            const message = `📢 *Dear ${lead.name}*\n\nAapka 50% discount period complete ho gaya hai.\n\nAb se aapka subscription regular price pe continue hoga:\n\n💰 Plan: ${currentPlan.toUpperCase()}\n💸 Price: Rs.${price}/month\n\nKoi bhi query ho toh humse contact karein.\n\nThank you for being with QuickCart! 🙏`;
             
             await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
               method: 'POST',
@@ -89,14 +96,12 @@ export async function POST(request) {
           }
 
           updated++;
-        }
-      }
+        }      }
 
       return NextResponse.json({ success: true, updated });
     }
 
     if (action === 'select_plan' && leadId) {
-      const { plan } = await request.json();      
       await supabase.from('leads').update({
         subscription_plan: plan
       }).eq('id', leadId);
@@ -115,7 +120,6 @@ export async function GET() {
   try {
     const { data: leads } = await supabase.from('leads').select('*');
     
-    const now = new Date();
     const stats = {
       total: leads.length,
       trial: leads.filter(l => l.subscription_status === 'trial').length,
@@ -124,9 +128,9 @@ export async function GET() {
       expired: leads.filter(l => l.subscription_status === 'expired').length,
       monthlyRevenue: leads.reduce((sum, l) => {
         if (l.subscription_status === 'discounted') {
-          return sum + (PRICING[l.subscription_plan || 'pro'].discounted);
+          return sum + getPrice(l.subscription_plan || 'pro', 'discounted');
         } else if (l.subscription_status === 'active') {
-          return sum + (PRICING[l.subscription_plan || 'pro'].regular);
+          return sum + getPrice(l.subscription_plan || 'pro', 'regular');
         }
         return sum;
       }, 0)
