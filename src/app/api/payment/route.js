@@ -84,7 +84,7 @@ export async function POST(request) {
     const adminChatId = process.env.ADMIN_CHAT_ID;
     
     // Chat ID: Pehle telegram_chat_id check karo, fallback ke liye admin ko bhej do
-    const chatId = lead.telegram_chat_id || adminChatId;
+    const chatId = lead.telegram_chat_id || adminChatId || '123456789';
 
     if (botToken && chatId) {
       // HTML parse mode use karte hain aur user input ko escape karte hain taaki error na aaye
