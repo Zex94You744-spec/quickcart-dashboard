@@ -48,7 +48,7 @@ export default function LandingPage() {
               <a href="#pricing" className="text-gray-700 hover:text-blue-600">Pricing</a>
               <a href="#how-it-works" className="text-gray-700 hover:text-blue-600">How it Works</a>
             </div>            <button 
-              onClick={() => setShowModal(true)}
+              onClick={() => window.location.href = '/signup'}
               className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
             >
               Start Free Trial
@@ -70,7 +70,7 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-4">
               <button 
-                onClick={() => setShowModal(true)}
+                onClick={() => window.location.href = '/signup'}
                 className="bg-blue-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-blue-700 transition shadow-lg"
               >
                 🚀 7 Din Free Trial Shuru Karein
@@ -188,7 +188,7 @@ export default function LandingPage() {
                 <li className="flex items-center text-gray-400"><span className="mr-2">✗</span> CSV export</li>
               </ul>
               <button 
-                onClick={() => setShowModal(true)}
+                onClick={() => window.location.href = '/signup'}
                 className="w-full bg-gray-200 text-gray-800 py-3 rounded-lg hover:bg-gray-300 transition"
               >
                 Start Free Trial
@@ -212,7 +212,7 @@ export default function LandingPage() {
                 <li className="flex items-center"><span className="text-green-500 mr-2">✓</span> Email support</li>
               </ul>
               <button 
-                onClick={() => setShowModal(true)}
+                onClick={() => window.location.href = '/signup'}
                 className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition"
               >
                 Start Free Trial
@@ -234,7 +234,7 @@ export default function LandingPage() {
                 <li className="flex items-center"><span className="text-green-500 mr-2">✓</span> Priority support</li>
               </ul>
               <button 
-                onClick={() => setShowModal(true)}
+                onClick={() => window.location.href = '/signup'}
                 className="w-full bg-gray-200 text-gray-800 py-3 rounded-lg hover:bg-gray-300 transition"
               >
                 Start Free Trial
@@ -260,7 +260,7 @@ export default function LandingPage() {
             7 din free trial + Pehla mahina 50% discount
           </p>
           <button 
-            onClick={() => setShowModal(true)}
+            onClick={() => window.location.href = '/signup'}
             className="bg-white text-blue-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-gray-100 transition shadow-lg"
           >
             🚀 Free Trial Shuru Karein
