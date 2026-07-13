@@ -84,13 +84,12 @@ export async function POST(request) {
     const adminChatId = process.env.ADMIN_CHAT_ID;
     
     // Chat ID: Pehle telegram_chat_id check karo, fallback ke liye admin ko bhej do
-    const chatId = lead.telegram_chat_id || adminChatId;
+    const chatId = adminChatId; 
     
     console.log('🔍 Debug Info:');
-    console.log('- lead.telegram_chat_id:', lead.telegram_chat_id);
+    console.log('- lead.telegram_chat_id (Phone Number, Invalid):', lead.telegram_chat_id);
     console.log('- adminChatId from env:', adminChatId);
-    console.log('- Final chatId:', chatId);
-    console.log('- Bot Token exists:', !!botToken);
+    console.log('- Final chatId being used:', chatId);
 
     if (botToken && chatId) {
       // ... existing message code ...
