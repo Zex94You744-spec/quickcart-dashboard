@@ -2,6 +2,10 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
+'use client';
+import { useState, useEffect, useSearchParams } from 'react';
+import { useRouter } from 'next/navigation'; // 👈 Ye add kar
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
@@ -38,6 +42,20 @@ export default function AdminLeadsPage() {
 
   useEffect(() => {
     fetchData();
+  }, []);
+
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    fetchData();
+    
+    // 👇 Agar payment success ke saath redirect hua hai, toh message dikhao
+    if (searchParams.get('payment_success') === 'true') {
+      alert('✅ Payment Successful! Lead ka status update ho gaya hai.');
+      // URL se parameters hata do taaki refresh pe dobara alert na aaye
+      router.replace('/admin/leads');
+    }
   }, []);
 
   async function fetchData() {

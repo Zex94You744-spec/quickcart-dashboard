@@ -50,7 +50,7 @@ export async function POST(request) {
     const price = getPrice(plan, isDiscounted ? 'discounted' : 'regular');
     const planName = plan.charAt(0).toUpperCase() + plan.slice(1);
     
-    // Razorpay Payment Link Create Kar
+      // Razorpay Payment Link Create Kar
     const paymentLink = await razorpay.paymentLink.create({
       amount: price * 100, // Amount in paise
       currency: 'INR',
@@ -71,7 +71,10 @@ export async function POST(request) {
         shop_name: lead.shop_name,
         plan: planName,
         subscription_type: isDiscounted ? 'First Month (50% OFF)' : 'Regular'
-      }
+      },
+      // 👇 YE 2 LINES ADD KAR (Redirect ke liye)
+      callback_url: `https://quickcart-dashboard-ten.vercel.app/admin/leads?payment_success=true&lead_id=${lead.id}`,
+      callback_method: 'get'
     });
 
     // Sirf payment URL return karo, koi Telegram code nahi
