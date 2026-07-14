@@ -89,7 +89,7 @@ export default function AdminLeadsPage() {
       ? PRICING[plan]?.discounted || 499
       : PRICING[plan]?.regular || 999;
     
-    if (!confirm(`Send payment link to ${lead.name} for Rs.${price}?`)) return;
+    if (!confirm(`Generate payment page for ${lead.name} for Rs.${price}?`)) return;
     
     try {
       const response = await fetch('/api/payment', {
@@ -104,13 +104,15 @@ export default function AdminLeadsPage() {
       const result = await response.json();
       
       if (result.success) {
-        alert(`✅ Payment link sent to ${lead.name}!\nAmount: Rs.${result.amount || price}\n\nCheck Telegram for link.`);
+        // Direct browser mein naye tab mein payment page open karo
+        window.open(result.paymentUrl, '_blank');
+        alert(`✅ Payment page open ho gaya hai!\nAmount: Rs.${result.amount}`);
       } else {
         alert('Error: ' + (result.error || 'Failed to create payment link'));
       }
     } catch (error) {
       console.error('Payment link error:', error);
-      alert('Failed to send payment link. Please check console for details.');
+      alert('Failed to generate payment link.');
     }
   }
 
