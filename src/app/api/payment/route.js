@@ -17,7 +17,7 @@ function getPrice(plan, priceType) {
   return planPricing[priceType];
 }
 
-// Helper function to escape HTML special characters
+// Helper function to escape HTML special characters for Telegram
 function escapeHtml(text) {
   if (!text) return '';
   return text
@@ -60,31 +60,43 @@ export async function POST(request) {
     const price = getPrice(plan, isDiscounted ? 'discounted' : 'regular');
     const planName = plan.charAt(0).toUpperCase() + plan.slice(1);
     
-    // Receipt ko short bana (Razorpay max 40 chars allow karta hai)
-    const receipt = `qc_${Date.now()}`;
-    
-    // Razorpay Order Create Kar
-    const payment = await razorpay.orders.create({
+    // Razorpay Payment Link Create Kar (Order ki jagah, kyunki isse direct short_url milta hai)
+    const paymentLink = await razorpay.paymentLink.create({
       amount: price * 100, // Amount in paise
       currency: 'INR',
-      receipt: receipt,
+      accept_partial: false,
+      description: `QuickCart Subscription - ${planName} ${isDiscounted ? '(50% OFF)' : ''}`,
+      customer: {
+        name: lead.name,
+        contact: lead.phone,
+        email: lead.email
+      },
+      notify: {
+        sms: false,
+        email: false
+      },
+      reminder_enable: true,
       notes: {
         lead_id: lead.id,
-        lead_name: lead.name,
         shop_name: lead.shop_name,
         plan: planName,
         subscription_type: isDiscounted ? 'First Month (50% OFF)' : 'Regular'
-      }
+      },
+      callback_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://quickcart-dashboard-ten.vercel.app'}/admin/leads`,
+      callback_method: 'get'
     });
 
-    const paymentUrl = payment.short_url || `https://razorpay.com/order/${payment.id}`;
+    const paymentUrl = paymentLink.short_url;
+    const paymentId = paymentLink.id;
+
+    console.log('✅ Payment Link Created:', paymentUrl);
 
     // Telegram Notification Bhejo
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     const adminChatId = process.env.ADMIN_CHAT_ID;
     
-    // Chat ID: Pehle telegram_chat_id check karo, fallback ke liye admin ko bhej do
-    const chatId = adminChatId; 
+    // IMPORTANT: lead.telegram_chat_id is a phone number (invalid for Telegram). 
+    // We force it to adminChatId so YOU receive the link and can forward it manually.    const chatId = adminChatId; 
     
     console.log('🔍 Debug Info:');
     console.log('- lead.telegram_chat_id (Phone Number, Invalid):', lead.telegram_chat_id);
@@ -92,15 +104,6 @@ export async function POST(request) {
     console.log('- Final chatId being used:', chatId);
 
     if (botToken && chatId) {
-      // ... existing message code ...
-    } else {
-      console.error('❌ Telegram notification skipped: Missing bot token or chat ID');
-      console.error('Bot Token:', botToken ? 'Exists' : 'MISSING');
-      console.error('Chat ID:', chatId || 'MISSING');
-    }
-
-    if (botToken && chatId) {
-      // HTML parse mode use karte hain aur user input ko escape karte hain taaki error na aaye
       const safeName = escapeHtml(lead.name);
       const safeShop = escapeHtml(lead.shop_name);
       const discountText = isDiscounted ? '<b>(50% OFF Applied!)</b>' : '';
@@ -109,12 +112,13 @@ export async function POST(request) {
 
 👤 Name: ${safeName}
 🏪 Shop: ${safeShop}
+
 💰 Plan: ${planName} ${discountText}
 💸 Amount: Rs.${price}
 
 🔗 <a href="${paymentUrl}">Click Here to Pay Securely</a>
 
-⏰ Valid for 24 hours
+⏰ Valid for 7 days
 
 Thank you for choosing QuickCart!`;
 
@@ -126,30 +130,31 @@ Thank you for choosing QuickCart!`;
             chat_id: chatId,
             text: message,
             parse_mode: 'HTML',
-            disable_web_page_preview: true
+            disable_web_page_preview: false
           })
         });
         
         const telegramResult = await telegramResponse.json();
         
         if (!telegramResult.ok) {
-          console.error('Telegram Error Details:', telegramResult);
+          console.error('❌ Telegram Error Details:', telegramResult);
+        } else {
+          console.log('✅ Telegram message sent successfully to chat:', chatId);
         }
       } catch (error) {
-        console.error('Telegram notification failed:', error);
+        console.error('❌ Telegram notification failed:', error);
       }
     } else {
-      console.warn('Telegram Bot Token or Chat ID missing. Notification skipped.');
-    }
+      console.warn('⚠️ Telegram Bot Token or Chat ID missing. Notification skipped.');    }
 
     return NextResponse.json({ 
       success: true, 
       paymentUrl,
-      orderId: payment.id,
+      paymentId,
       amount: price
     });
   } catch (error) {
-    console.error('Payment Link Error:', error);
+    console.error('❌ Payment Link Error:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
