@@ -1,4 +1,6 @@
 'use client';
+export const dynamic = 'force-dynamic'; // 👈 Ye line prerendering error ko fix karti hai
+
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
@@ -45,9 +47,9 @@ const PLANS = [
     price: 1999,
     discountedPrice: 999,
     description: 'Large businesses aur multi-user ke liye',
-    features: [
-      '✅ Everything in Pro',
-      '✅ Multi-user Staff Access',      '✅ Custom Branding (Your Logo)',
+    features: [      '✅ Everything in Pro',
+      '✅ Multi-user Staff Access',
+      '✅ Custom Branding (Your Logo)',
       '✅ Priority 24/7 Support',
       '✅ Advanced API Access',
       '✅ Dedicated Account Manager'
@@ -94,9 +96,9 @@ export default function CheckoutPage() {
       const result = await response.json();
       
       if (result.success) {
-        window.location.href = result.paymentUrl;
-      } else {
-        alert('❌ Error: ' + (result.error || 'Failed to create payment link'));        setProcessing(false);
+        window.location.href = result.paymentUrl;      } else {
+        alert('❌ Error: ' + (result.error || 'Failed to create payment link'));
+        setProcessing(false);
       }
     } catch (error) {
       console.error('Payment error:', error);
@@ -143,9 +145,9 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-          {PLANS.map((plan) => {            const isSelected = plan.id === selectedPlan.id;
+        {/* Pricing Cards */}        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+          {PLANS.map((plan) => {
+            const isSelected = plan.id === selectedPlan.id;
             const displayPrice = isDiscounted ? plan.discountedPrice : plan.price;
             const originalPrice = isDiscounted ? plan.price : null;
 
@@ -192,9 +194,9 @@ export default function CheckoutPage() {
                   </div>
 
                   <ul className="space-y-3 mb-8">
-                    {plan.features.map((feature, idx) => (
-                      <li key={idx} className="text-sm text-gray-700 flex items-start">
-                        <span className="mr-2">{feature.startsWith('✅') ? '✅' : '❌'}</span>                        <span>{feature.substring(2)}</span>
+                    {plan.features.map((feature, idx) => (                      <li key={idx} className="text-sm text-gray-700 flex items-start">
+                        <span className="mr-2">{feature.startsWith('✅') ? '✅' : '❌'}</span>
+                        <span>{feature.substring(2)}</span>
                       </li>
                     ))}
                   </ul>
