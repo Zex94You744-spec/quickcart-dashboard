@@ -2,10 +2,6 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-'use client';
-import { useState, useEffect, useSearchParams } from 'react';
-import { useRouter } from 'next/navigation'; // 👈 Ye add kar
-
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
@@ -42,19 +38,18 @@ export default function AdminLeadsPage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
-
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
-  useEffect(() => {
-    fetchData();
     
-    // 👇 Agar payment success ke saath redirect hua hai, toh message dikhao
-    if (searchParams.get('payment_success') === 'true') {
-      alert('✅ Payment Successful! Lead ka status update ho gaya hai.');
-      // URL se parameters hata do taaki refresh pe dobara alert na aaye
-      router.replace('/admin/leads');
+    // Check for payment success in URL (Safe method without Next.js Suspense issues)
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('payment_success') === 'true') {
+        setTimeout(() => {
+          alert('✅ Payment Successful! Lead ka status update ho gaya hai.');
+          // Clean the URL
+          window.history.replaceState({}, document.title, '/admin/leads');
+          // Refresh data to show updated status          fetchData();
+        }, 1000);
+      }
     }
   }, []);
 
@@ -65,7 +60,8 @@ export default function AdminLeadsPage() {
       .order('created_at', { ascending: false });
 
     if (data) {
-      setLeads(data);      calculateStats(data);
+      setLeads(data);
+      calculateStats(data);
     }
     setLoading(false);
   }
@@ -100,7 +96,6 @@ export default function AdminLeadsPage() {
       ));
     }
   }
-
   async function handleSendPaymentLink(lead: Lead) {
     const plan = lead.subscription_plan || 'pro';
     const price = lead.subscription_status === 'discounted' 
@@ -124,13 +119,13 @@ export default function AdminLeadsPage() {
       if (result.success) {
         // Direct browser mein naye tab mein payment page open karo
         window.open(result.paymentUrl, '_blank');
-        alert(`✅ Payment page open ho gaya hai!\nAmount: Rs.${result.amount}`);
+        // alert(`✅ Payment page open ho gaya hai!\nAmount: Rs.${result.amount}`);
       } else {
-        alert('Error: ' + (result.error || 'Failed to create payment link'));
+        alert('❌ Error: ' + (result.error || 'Failed to create payment link'));
       }
     } catch (error) {
       console.error('Payment link error:', error);
-      alert('Failed to generate payment link.');
+      alert('❌ Failed to generate payment link.');
     }
   }
 
@@ -145,13 +140,12 @@ export default function AdminLeadsPage() {
     
     const result = await response.json();
     if (result.success) {
-      alert(`${result.updated} subscriptions update ho gayi!`);
+      alert(`✅ ${result.updated} subscriptions update ho gayi!`);
       fetchData();
     }
   }
 
-  function getSubscriptionBadge(lead: Lead) {
-    const now = new Date();
+  function getSubscriptionBadge(lead: Lead) {    const now = new Date();
     const plan = lead.subscription_plan || 'pro';
     
     if (lead.subscription_status === 'trial') {
@@ -167,7 +161,8 @@ export default function AdminLeadsPage() {
           </div>
         </div>
       );
-    } else if (lead.subscription_status === 'discounted') {      const discountEnd = new Date(lead.discount_end_date);
+    } else if (lead.subscription_status === 'discounted') {
+      const discountEnd = new Date(lead.discount_end_date);
       const daysLeft = Math.ceil((discountEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       const price = PRICING[plan].discounted;
       return (
@@ -199,8 +194,7 @@ export default function AdminLeadsPage() {
   function exportToCSV() {
     const headers = ['Name', 'Shop', 'Phone', 'Email', 'Status', 'Plan', 'Subscription', 'Price', 'Trial End', 'Discount End'];
     const rows = leads.map(lead => {
-      const plan = lead.subscription_plan || 'pro';
-      let price = 0;
+      const plan = lead.subscription_plan || 'pro';      let price = 0;
       if (lead.subscription_status === 'discounted') price = PRICING[plan].discounted;
       else if (lead.subscription_status === 'active') price = PRICING[plan].regular;
       
@@ -217,6 +211,7 @@ export default function AdminLeadsPage() {
         lead.discount_end_date ? new Date(lead.discount_end_date).toLocaleDateString('en-IN') : 'N/A'
       ];
     });
+
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -248,9 +243,8 @@ export default function AdminLeadsPage() {
           <div className="flex gap-3">
             <button 
               onClick={runSubscriptionCheck}
-              className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600"
-            >
-               Update Subscriptions
+              className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600"            >
+              🔄 Update Subscriptions
             </button>
             <button 
               onClick={exportToCSV}
@@ -266,6 +260,7 @@ export default function AdminLeadsPage() {
             </a>
           </div>
         </div>
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow p-6">
@@ -297,8 +292,7 @@ export default function AdminLeadsPage() {
               { key: 'all', label: 'All' },
               { key: 'trial', label: 'Trial' },
               { key: 'discounted', label: 'Discounted' },
-              { key: 'active', label: 'Active' }
-            ].map(f => (
+              { key: 'active', label: 'Active' }            ].map(f => (
               <button
                 key={f.key}
                 onClick={() => setFilter(f.key)}
@@ -314,7 +308,8 @@ export default function AdminLeadsPage() {
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">All Leads</h2>
-          </div>          {filteredLeads.length === 0 ? (
+          </div>
+          {filteredLeads.length === 0 ? (
             <div className="p-8 text-center text-gray-600">No leads found.</div>
           ) : (
             <div className="overflow-x-auto">
@@ -346,8 +341,7 @@ export default function AdminLeadsPage() {
                           value={lead.subscription_plan || 'pro'}
                           onChange={(e) => {
                             supabase.from('leads').update({ subscription_plan: e.target.value }).eq('id', lead.id);
-                            setLeads(leads.map(l => l.id === lead.id ? {...l, subscription_plan: e.target.value} : l));
-                          }}
+                            setLeads(leads.map(l => l.id === lead.id ? {...l, subscription_plan: e.target.value} : l));                          }}
                           className="border border-gray-300 rounded px-2 py-1 text-xs"
                         >
                           <option value="starter">Starter (₹499)</option>
@@ -363,7 +357,8 @@ export default function AdminLeadsPage() {
                           value={lead.status}
                           onChange={(e) => updateStatus(lead.id, e.target.value)}
                           className="border border-gray-300 rounded px-2 py-1 text-xs"
-                        >                          <option value="new">New</option>
+                        >
+                          <option value="new">New</option>
                           <option value="contacted">Contacted</option>
                           <option value="converted">Converted</option>
                           <option value="rejected">Rejected</option>
