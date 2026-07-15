@@ -60,9 +60,11 @@ export default function CheckoutPage() {
   const [lead, setLead] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  
+  // User ko koi bhi plan select karne ki freedom do
+  const [selectedPlanId, setSelectedPlanId] = useState<string>('pro');
 
   useEffect(() => {
-    // Safely get lead_id from URL without Next.js prerendering issues
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const id = params.get('lead_id');
@@ -84,6 +86,8 @@ export default function CheckoutPage() {
 
     if (data) {
       setLead(data);
+      // Default selected plan wo hoga jo user ne signup pe choose kiya tha
+      setSelectedPlanId(data.subscription_plan || 'pro');
     }
     setLoading(false);
   }
@@ -92,11 +96,11 @@ export default function CheckoutPage() {
     if (!leadId) return;
     setProcessing(true);
     try {
-      const response = await fetch('/api/payment', {
-        method: 'POST',
+      const response = await fetch('/api/payment', {        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ leadId, plan: planId })
-      });      
+      });
+      
       const result = await response.json();
       
       if (result.success) {
@@ -133,7 +137,6 @@ export default function CheckoutPage() {
   }
 
   const isDiscounted = lead.subscription_status === 'discounted';
-  const selectedPlan = PLANS.find(p => p.id === (lead.subscription_plan || 'pro')) || PLANS[1];
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -142,10 +145,10 @@ export default function CheckoutPage() {
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Complete Your Subscription</h1>
           <p className="text-lg text-gray-600">
-            Review your plan details and proceed to secure payment.
-          </p>
+            Review your plan details and proceed to secure payment.          </p>
           <div className="mt-4 inline-flex items-center bg-blue-50 px-4 py-2 rounded-full border border-blue-200">
-            <span className="text-blue-800 font-medium">👤 {lead.name}</span>            <span className="mx-2 text-blue-300">|</span>
+            <span className="text-blue-800 font-medium">👤 {lead.name}</span>
+            <span className="mx-2 text-blue-300">|</span>
             <span className="text-blue-800 font-medium">🏪 {lead.shop_name}</span>
           </div>
         </div>
@@ -153,15 +156,16 @@ export default function CheckoutPage() {
         {/* Pricing Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
           {PLANS.map((plan) => {
-            const isSelected = plan.id === selectedPlan.id;
+            const isSelected = plan.id === selectedPlanId;
             const displayPrice = isDiscounted ? plan.discountedPrice : plan.price;
             const originalPrice = isDiscounted ? plan.price : null;
 
             return (
               <div 
                 key={plan.id}
-                className={`relative bg-white rounded-2xl shadow-lg border-2 transition-all duration-300 ${
-                  isSelected ? 'border-blue-600 ring-4 ring-blue-100 scale-105 z-10' : 'border-gray-100 hover:border-gray-300'
+                onClick={() => setSelectedPlanId(plan.id)} // 👈 Click karne par plan select ho jayega
+                className={`relative bg-white rounded-2xl shadow-lg border-2 transition-all duration-300 cursor-pointer ${
+                  isSelected ? 'border-blue-600 ring-4 ring-blue-100 scale-105 z-10' : 'border-gray-100 hover:border-gray-300 hover:shadow-xl'
                 }`}
               >
                 {plan.popular && (
@@ -172,11 +176,6 @@ export default function CheckoutPage() {
                 {isSelected && isDiscounted && (
                   <div className="absolute -top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-bold animate-pulse">
                     🎉 50% OFF APPLIED
-                  </div>
-                )}
-                {isSelected && !isDiscounted && (
-                  <div className="absolute -top-4 right-4 bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-bold">
-                    YOUR PLAN
                   </div>
                 )}
 
@@ -194,8 +193,8 @@ export default function CheckoutPage() {
                     ) : (
                       <div className="flex items-baseline gap-2">
                         <span className="text-4xl font-bold text-gray-900">₹{displayPrice}</span>
-                        <span className="text-sm text-gray-500">/month</span>                      </div>
-                    )}
+                        <span className="text-sm text-gray-500">/month</span>
+                      </div>                    )}
                   </div>
 
                   <ul className="space-y-3 mb-8">
@@ -208,15 +207,18 @@ export default function CheckoutPage() {
                   </ul>
 
                   <button
-                    onClick={() => handlePayment(plan.id)}
-                    disabled={processing || !isSelected}
+                    onClick={(e) => {
+                      e.stopPropagation(); // Card click event ko rokna taaki button alag se kaam kare
+                      handlePayment(plan.id);
+                    }}
+                    disabled={processing}
                     className={`w-full py-3 px-4 rounded-xl font-semibold transition-all ${
                       isSelected
                         ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg'
-                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
-                    {processing && isSelected ? 'Processing...' : isSelected ? 'Proceed to Pay' : 'Selected'}
+                    {processing && isSelected ? 'Processing...' : isSelected ? 'Proceed to Pay' : 'Choose Plan'}
                   </button>
                 </div>
               </div>
