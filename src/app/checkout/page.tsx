@@ -1,8 +1,6 @@
 'use client';
-export const dynamic = 'force-dynamic'; // 👈 Ye line prerendering error ko fix karti hai
 
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -47,9 +45,9 @@ const PLANS = [
     price: 1999,
     discountedPrice: 999,
     description: 'Large businesses aur multi-user ke liye',
-    features: [      '✅ Everything in Pro',
-      '✅ Multi-user Staff Access',
-      '✅ Custom Branding (Your Logo)',
+    features: [
+      '✅ Everything in Pro',
+      '✅ Multi-user Staff Access',      '✅ Custom Branding (Your Logo)',
       '✅ Priority 24/7 Support',
       '✅ Advanced API Access',
       '✅ Dedicated Account Manager'
@@ -58,24 +56,30 @@ const PLANS = [
 ];
 
 export default function CheckoutPage() {
-  const searchParams = useSearchParams();
-  const leadId = searchParams.get('lead_id');
-  
+  const [leadId, setLeadId] = useState<string | null>(null);
   const [lead, setLead] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
-    if (leadId) {
-      fetchLead();
+    // Safely get lead_id from URL without Next.js prerendering issues
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('lead_id');
+      setLeadId(id);
+      if (id) {
+        fetchLead(id);
+      } else {
+        setLoading(false);
+      }
     }
-  }, [leadId]);
+  }, []);
 
-  async function fetchLead() {
+  async function fetchLead(id: string) {
     const { data, error } = await supabase
       .from('leads')
       .select('*')
-      .eq('id', leadId)
+      .eq('id', id)
       .single();
 
     if (data) {
@@ -85,18 +89,19 @@ export default function CheckoutPage() {
   }
 
   async function handlePayment(planId: string) {
+    if (!leadId) return;
     setProcessing(true);
     try {
       const response = await fetch('/api/payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ leadId, plan: planId })
-      });
-      
+      });      
       const result = await response.json();
       
       if (result.success) {
-        window.location.href = result.paymentUrl;      } else {
+        window.location.href = result.paymentUrl;
+      } else {
         alert('❌ Error: ' + (result.error || 'Failed to create payment link'));
         setProcessing(false);
       }
@@ -110,7 +115,7 @@ export default function CheckoutPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-xl text-gray-600">Loading your checkout details...</div>
+        <div className="text-xl text-gray-600 animate-pulse">Loading your checkout details...</div>
       </div>
     );
   }
@@ -121,6 +126,7 @@ export default function CheckoutPage() {
         <div className="text-center">
           <h2 className="text-2xl font-bold text-red-600">Invalid Link</h2>
           <p className="text-gray-600 mt-2">Please contact support or go back to the dashboard.</p>
+          <a href="/admin/leads" className="mt-4 inline-block text-blue-600 hover:underline">Go to Dashboard</a>
         </div>
       </div>
     );
@@ -139,13 +145,13 @@ export default function CheckoutPage() {
             Review your plan details and proceed to secure payment.
           </p>
           <div className="mt-4 inline-flex items-center bg-blue-50 px-4 py-2 rounded-full border border-blue-200">
-            <span className="text-blue-800 font-medium">👤 {lead.name}</span>
-            <span className="mx-2 text-blue-300">|</span>
+            <span className="text-blue-800 font-medium">👤 {lead.name}</span>            <span className="mx-2 text-blue-300">|</span>
             <span className="text-blue-800 font-medium">🏪 {lead.shop_name}</span>
           </div>
         </div>
 
-        {/* Pricing Cards */}        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+        {/* Pricing Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
           {PLANS.map((plan) => {
             const isSelected = plan.id === selectedPlan.id;
             const displayPrice = isDiscounted ? plan.discountedPrice : plan.price;
@@ -188,13 +194,13 @@ export default function CheckoutPage() {
                     ) : (
                       <div className="flex items-baseline gap-2">
                         <span className="text-4xl font-bold text-gray-900">₹{displayPrice}</span>
-                        <span className="text-sm text-gray-500">/month</span>
-                      </div>
+                        <span className="text-sm text-gray-500">/month</span>                      </div>
                     )}
                   </div>
 
                   <ul className="space-y-3 mb-8">
-                    {plan.features.map((feature, idx) => (                      <li key={idx} className="text-sm text-gray-700 flex items-start">
+                    {plan.features.map((feature, idx) => (
+                      <li key={idx} className="text-sm text-gray-700 flex items-start">
                         <span className="mr-2">{feature.startsWith('✅') ? '✅' : '❌'}</span>
                         <span>{feature.substring(2)}</span>
                       </li>
@@ -221,7 +227,7 @@ export default function CheckoutPage() {
         {/* Trust Badges */}
         <div className="text-center border-t border-gray-200 pt-8">
           <p className="text-sm text-gray-500 mb-4">🔒 Secured by Razorpay | 100% Safe & Encrypted</p>
-          <div className="flex justify-center gap-6 text-gray-400">
+          <div className="flex justify-center gap-6 text-gray-400 flex-wrap">
             <span>💳 UPI / Cards / Net Banking</span>
             <span>📜 GST Invoice Provided</span>
             <span>🔄 Cancel Anytime</span>
