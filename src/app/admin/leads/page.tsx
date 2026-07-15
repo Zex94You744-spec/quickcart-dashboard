@@ -40,18 +40,6 @@ export default function AdminLeadsPage() {
     fetchData();
     
     // Check for payment success in URL (Safe method without Next.js Suspense issues)
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('payment_success') === 'true') {
-        setTimeout(() => {
-          alert('✅ Payment Successful! Lead ka status update ho gaya hai.');
-          // Clean the URL
-          window.history.replaceState({}, document.title, '/admin/leads');
-          // Refresh data to show updated status          fetchData();
-        }, 1000);
-      }
-    }
-  }, []);
 
   async function fetchData() {
     const { data, error } = await supabase

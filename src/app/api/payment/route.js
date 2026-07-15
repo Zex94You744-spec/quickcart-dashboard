@@ -73,7 +73,7 @@ export async function POST(request) {
         subscription_type: isDiscounted ? 'First Month (50% OFF)' : 'Regular'
       },
       // 👇 YE 2 LINES ADD KAR (Redirect ke liye)
-      callback_url: `https://quickcart-dashboard-ten.vercel.app/admin/leads?payment_success=true&lead_id=${lead.id}`,
+      callback_url: `https://quickcart-dashboard-ten.vercel.app/payment-success?lead_id=${lead.id}`,
       callback_method: 'get'
     });
 
