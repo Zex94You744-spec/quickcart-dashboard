@@ -38,8 +38,7 @@ export default function AdminLeadsPage() {
 
   useEffect(() => {
     fetchData();
-    
-    // Check for payment success in URL (Safe method without Next.js Suspense issues)
+  }, []);
 
   async function fetchData() {
     const { data, error } = await supabase
@@ -48,8 +47,7 @@ export default function AdminLeadsPage() {
       .order('created_at', { ascending: false });
 
     if (data) {
-      setLeads(data);
-      calculateStats(data);
+      setLeads(data);      calculateStats(data);
     }
     setLoading(false);
   }
@@ -84,7 +82,7 @@ export default function AdminLeadsPage() {
       ));
     }
   }
-  // 👇 YE FUNCTION UPDATE KIYA GAYA HAI (Direct Checkout Page par bhejega)
+
   async function handleSendPaymentLink(lead: Lead) {
     const plan = lead.subscription_plan || 'pro';
     const price = lead.subscription_status === 'discounted' 
@@ -98,8 +96,7 @@ export default function AdminLeadsPage() {
   }
 
   async function runSubscriptionCheck() {
-    if (!confirm('Saari subscriptions check aur update karna hai?')) return;
-    
+    if (!confirm('Saari subscriptions check aur update karna hai?')) return;    
     const response = await fetch('/api/subscriptions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -133,7 +130,8 @@ export default function AdminLeadsPage() {
     } else if (lead.subscription_status === 'discounted') {
       const discountEnd = new Date(lead.discount_end_date);
       const daysLeft = Math.ceil((discountEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      const price = PRICING[plan].discounted;      return (
+      const price = PRICING[plan].discounted;
+      return (
         <div>
           <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-semibold">
             50% OFF
@@ -147,8 +145,7 @@ export default function AdminLeadsPage() {
       const price = PRICING[plan].regular;
       return (
         <div>
-          <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-semibold">
-            ACTIVE
+          <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-semibold">            ACTIVE
           </span>
           <div className="text-xs text-gray-600 mt-1">
             Rs.{price}/mo
@@ -182,7 +179,8 @@ export default function AdminLeadsPage() {
     });
 
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });    const url = URL.createObjectURL(blob);
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `leads-${new Date().toISOString().split('T')[0]}.csv`;
@@ -196,8 +194,7 @@ export default function AdminLeadsPage() {
     leads;
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
@@ -231,7 +228,8 @@ export default function AdminLeadsPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">          <div className="bg-white rounded-lg shadow p-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+          <div className="bg-white rounded-lg shadow p-6">
             <div className="text-sm text-gray-600">Total Leads</div>
             <div className="text-3xl font-bold text-gray-900 mt-2">{stats.total}</div>
           </div>
@@ -245,8 +243,7 @@ export default function AdminLeadsPage() {
           </div>
           <div className="bg-white rounded-lg shadow p-6">
             <div className="text-sm text-gray-600">Active Paid</div>
-            <div className="text-3xl font-bold text-purple-600 mt-2">{stats.active}</div>
-          </div>
+            <div className="text-3xl font-bold text-purple-600 mt-2">{stats.active}</div>          </div>
           <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow p-6 text-white">
             <div className="text-sm">Monthly Revenue</div>
             <div className="text-3xl font-bold mt-2">₹{stats.monthlyRevenue || 0}</div>
@@ -280,7 +277,8 @@ export default function AdminLeadsPage() {
           </div>
           {filteredLeads.length === 0 ? (
             <div className="p-8 text-center text-gray-600">No leads found.</div>
-          ) : (            <div className="overflow-x-auto">
+          ) : (
+            <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -294,8 +292,7 @@ export default function AdminLeadsPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredLeads.map((lead) => (
-                    <tr key={lead.id} className="hover:bg-gray-50">
+                  {filteredLeads.map((lead) => (                    <tr key={lead.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">
                         {lead.name}
                         <div className="text-xs text-gray-500">{lead.email}</div>
@@ -329,7 +326,8 @@ export default function AdminLeadsPage() {
                         >
                           <option value="new">New</option>
                           <option value="contacted">Contacted</option>
-                          <option value="converted">Converted</option>                          <option value="rejected">Rejected</option>
+                          <option value="converted">Converted</option>
+                          <option value="rejected">Rejected</option>
                         </select>
                       </td>
                       <td className="px-6 py-4 text-sm space-y-2">
@@ -343,8 +341,7 @@ export default function AdminLeadsPage() {
                           href={`https://wa.me/91${lead.phone}`}
                           target="_blank"
                           className="text-green-600 hover:underline block"
-                        >
-                          💬 WhatsApp
+                        >                          💬 WhatsApp
                         </a>
                       </td>
                     </tr>
