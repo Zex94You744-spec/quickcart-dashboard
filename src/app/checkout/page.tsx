@@ -94,10 +94,9 @@ export default function CheckoutPage() {
       const result = await response.json();
       
       if (result.success) {
-        // Redirect to Razorpay secure payment page
         window.location.href = result.paymentUrl;
-      } else {        alert('❌ Error: ' + (result.error || 'Failed to create payment link'));
-        setProcessing(false);
+      } else {
+        alert('❌ Error: ' + (result.error || 'Failed to create payment link'));        setProcessing(false);
       }
     } catch (error) {
       console.error('Payment error:', error);
@@ -145,8 +144,8 @@ export default function CheckoutPage() {
         </div>
 
         {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">          {PLANS.map((plan) => {
-            const isSelected = plan.id === selectedPlan.id;
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+          {PLANS.map((plan) => {            const isSelected = plan.id === selectedPlan.id;
             const displayPrice = isDiscounted ? plan.discountedPrice : plan.price;
             const originalPrice = isDiscounted ? plan.price : null;
 
@@ -194,8 +193,8 @@ export default function CheckoutPage() {
 
                   <ul className="space-y-3 mb-8">
                     {plan.features.map((feature, idx) => (
-                      <li key={idx} className="text-sm text-gray-700 flex items-start">                        <span className="mr-2">{feature.startsWith('✅') ? '✅' : '❌'}</span>
-                        <span>{feature.substring(2)}</span>
+                      <li key={idx} className="text-sm text-gray-700 flex items-start">
+                        <span className="mr-2">{feature.startsWith('✅') ? '✅' : '❌'}</span>                        <span>{feature.substring(2)}</span>
                       </li>
                     ))}
                   </ul>
@@ -229,3 +228,4 @@ export default function CheckoutPage() {
       </div>
     </div>
   );
+}
