@@ -96,13 +96,18 @@ export default function AdminLeadsPage() {
       ));
     }
   }
+
   async function handleSendPaymentLink(lead: Lead) {
     const plan = lead.subscription_plan || 'pro';
     const price = lead.subscription_status === 'discounted' 
       ? PRICING[plan]?.discounted || 499
       : PRICING[plan]?.regular || 999;
     
-    if (!confirm(`Generate payment page for ${lead.name} for Rs.${price}?`)) return;
+    if (!confirm(`Open checkout page for ${lead.name} (Rs.${price})?`)) return;
+    
+    // Naye checkout page par redirect kar do
+    window.open(`/checkout?lead_id=${lead.id}`, '_blank');
+  }
     
     try {
       const response = await fetch('/api/payment', {
