@@ -96,7 +96,7 @@ export default function AdminLeadsPage() {
       ));
     }
   }
-
+  // 👇 YE FUNCTION UPDATE KIYA GAYA HAI (Direct Checkout Page par bhejega)
   async function handleSendPaymentLink(lead: Lead) {
     const plan = lead.subscription_plan || 'pro';
     const price = lead.subscription_status === 'discounted' 
@@ -105,33 +105,8 @@ export default function AdminLeadsPage() {
     
     if (!confirm(`Open checkout page for ${lead.name} (Rs.${price})?`)) return;
     
-    // Naye checkout page par redirect kar do
+    // Naye professional checkout page par redirect kar do
     window.open(`/checkout?lead_id=${lead.id}`, '_blank');
-  }
-    
-    try {
-      const response = await fetch('/api/payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          leadId: lead.id,
-          plan: plan
-        })
-      });
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        // Direct browser mein naye tab mein payment page open karo
-        window.open(result.paymentUrl, '_blank');
-        // alert(`✅ Payment page open ho gaya hai!\nAmount: Rs.${result.amount}`);
-      } else {
-        alert('❌ Error: ' + (result.error || 'Failed to create payment link'));
-      }
-    } catch (error) {
-      console.error('Payment link error:', error);
-      alert('❌ Failed to generate payment link.');
-    }
   }
 
   async function runSubscriptionCheck() {
@@ -150,7 +125,8 @@ export default function AdminLeadsPage() {
     }
   }
 
-  function getSubscriptionBadge(lead: Lead) {    const now = new Date();
+  function getSubscriptionBadge(lead: Lead) {
+    const now = new Date();
     const plan = lead.subscription_plan || 'pro';
     
     if (lead.subscription_status === 'trial') {
@@ -169,8 +145,7 @@ export default function AdminLeadsPage() {
     } else if (lead.subscription_status === 'discounted') {
       const discountEnd = new Date(lead.discount_end_date);
       const daysLeft = Math.ceil((discountEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      const price = PRICING[plan].discounted;
-      return (
+      const price = PRICING[plan].discounted;      return (
         <div>
           <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-semibold">
             50% OFF
@@ -199,7 +174,8 @@ export default function AdminLeadsPage() {
   function exportToCSV() {
     const headers = ['Name', 'Shop', 'Phone', 'Email', 'Status', 'Plan', 'Subscription', 'Price', 'Trial End', 'Discount End'];
     const rows = leads.map(lead => {
-      const plan = lead.subscription_plan || 'pro';      let price = 0;
+      const plan = lead.subscription_plan || 'pro';
+      let price = 0;
       if (lead.subscription_status === 'discounted') price = PRICING[plan].discounted;
       else if (lead.subscription_status === 'active') price = PRICING[plan].regular;
       
@@ -218,8 +194,7 @@ export default function AdminLeadsPage() {
     });
 
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
+    const blob = new Blob([csvContent], { type: 'text/csv' });    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `leads-${new Date().toISOString().split('T')[0]}.csv`;
@@ -248,7 +223,8 @@ export default function AdminLeadsPage() {
           <div className="flex gap-3">
             <button 
               onClick={runSubscriptionCheck}
-              className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600"            >
+              className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600"
+            >
               🔄 Update Subscriptions
             </button>
             <button 
@@ -267,8 +243,7 @@ export default function AdminLeadsPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">          <div className="bg-white rounded-lg shadow p-6">
             <div className="text-sm text-gray-600">Total Leads</div>
             <div className="text-3xl font-bold text-gray-900 mt-2">{stats.total}</div>
           </div>
@@ -297,7 +272,8 @@ export default function AdminLeadsPage() {
               { key: 'all', label: 'All' },
               { key: 'trial', label: 'Trial' },
               { key: 'discounted', label: 'Discounted' },
-              { key: 'active', label: 'Active' }            ].map(f => (
+              { key: 'active', label: 'Active' }
+            ].map(f => (
               <button
                 key={f.key}
                 onClick={() => setFilter(f.key)}
@@ -316,8 +292,7 @@ export default function AdminLeadsPage() {
           </div>
           {filteredLeads.length === 0 ? (
             <div className="p-8 text-center text-gray-600">No leads found.</div>
-          ) : (
-            <div className="overflow-x-auto">
+          ) : (            <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -346,7 +321,8 @@ export default function AdminLeadsPage() {
                           value={lead.subscription_plan || 'pro'}
                           onChange={(e) => {
                             supabase.from('leads').update({ subscription_plan: e.target.value }).eq('id', lead.id);
-                            setLeads(leads.map(l => l.id === lead.id ? {...l, subscription_plan: e.target.value} : l));                          }}
+                            setLeads(leads.map(l => l.id === lead.id ? {...l, subscription_plan: e.target.value} : l));
+                          }}
                           className="border border-gray-300 rounded px-2 py-1 text-xs"
                         >
                           <option value="starter">Starter (₹499)</option>
@@ -365,8 +341,7 @@ export default function AdminLeadsPage() {
                         >
                           <option value="new">New</option>
                           <option value="contacted">Contacted</option>
-                          <option value="converted">Converted</option>
-                          <option value="rejected">Rejected</option>
+                          <option value="converted">Converted</option>                          <option value="rejected">Rejected</option>
                         </select>
                       </td>
                       <td className="px-6 py-4 text-sm space-y-2">
