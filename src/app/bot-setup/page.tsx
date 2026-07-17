@@ -7,7 +7,7 @@ export default function BotSetupPage() {
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Telegram Bot Setup Guide</h1>
           <p className="text-lg text-gray-600">
-            Apna QuickCart bot sirf 5 minute mein setup karein. Koi coding nahi chahiye!
+            Set up your QuickCart bot in just 5 minutes. No coding required!
           </p>
         </div>
 
@@ -18,13 +18,13 @@ export default function BotSetupPage() {
           <div className="mb-8">
             <div className="flex items-center mb-3">
               <span className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3">1</span>
-              <h2 className="text-xl font-bold text-gray-900">BotFather ko open karein</h2>
+              <h2 className="text-xl font-bold text-gray-900">Open BotFather</h2>
             </div>
             <p className="text-gray-600 ml-11 mb-3">
-              Telegram app kholiye aur search bar mein <code className="bg-gray-100 px-2 py-1 rounded text-blue-600 font-mono">@BotFather</code> search karein.
+              Open the Telegram app and search for <code className="bg-gray-100 px-2 py-1 rounded text-blue-600 font-mono">@BotFather</code> in the search bar.
             </p>
             <p className="text-gray-600 ml-11">
-              Blue tick wale official BotFather account par click karein aur <strong>Start</strong> button dabayein.
+              Click on the official BotFather account (with the blue tick) and tap the <strong>Start</strong> button.
             </p>
           </div>
 
@@ -34,10 +34,10 @@ export default function BotSetupPage() {
           <div className="mb-8">
             <div className="flex items-center mb-3">
               <span className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3">2</span>
-              <h2 className="text-xl font-bold text-gray-900">Naya Bot Banayein</h2>
+              <h2 className="text-xl font-bold text-gray-900">Create a New Bot</h2>
             </div>
             <p className="text-gray-600 ml-11 mb-3">
-              Chat box mein ye command type karke bhejein:
+              Type and send the following command in the chat box:
             </p>
             <div className="ml-11 bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-lg inline-block">
               /newbot
@@ -49,10 +49,10 @@ export default function BotSetupPage() {
           {/* Step 3 */}
           <div className="mb-8">            <div className="flex items-center mb-3">
               <span className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3">3</span>
-              <h2 className="text-xl font-bold text-gray-900">Bot ka Naam dein</h2>
+              <h2 className="text-xl font-bold text-gray-900">Name Your Bot</h2>
             </div>
             <p className="text-gray-600 ml-11">
-              BotFather aapse bot ka naam puchega. Koi bhi naam dein, jaise: <br/>
+              BotFather will ask for a name for your bot. You can give it any name, for example: <br/>
               <code className="bg-gray-100 px-2 py-1 rounded text-gray-800 font-mono">Rahul General Store Bot</code>
             </p>
           </div>
@@ -63,10 +63,10 @@ export default function BotSetupPage() {
           <div className="mb-8">
             <div className="flex items-center mb-3">
               <span className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3">4</span>
-              <h2 className="text-xl font-bold text-gray-900">Username Set Karein</h2>
+              <h2 className="text-xl font-bold text-gray-900">Set a Username</h2>
             </div>
             <p className="text-gray-600 ml-11 mb-3">
-              Ab ek unique username chahiye. Dhyan rahe, username ke end mein <strong>'bot'</strong> hona zaroori hai. <br/>
+              Now, you need a unique username. Please note, the username must end with <strong>'bot'</strong>. <br/>
               Example: <code className="bg-gray-100 px-2 py-1 rounded text-gray-800 font-mono">rahul_store_quickbot</code>
             </p>
           </div>
@@ -77,10 +77,10 @@ export default function BotSetupPage() {
           <div className="mb-4">
             <div className="flex items-center mb-3">
               <span className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3">5</span>
-              <h2 className="text-xl font-bold text-gray-900">API Token Copy Karein</h2>
+              <h2 className="text-xl font-bold text-gray-900">Copy Your API Token</h2>
             </div>
             <p className="text-gray-600 ml-11 mb-3">
-              BotFather aapko ek lamba message bhejega. Usme aapko ek <strong>HTTP API Token</strong> milega jo kuch aisa dikhta hai:
+              BotFather will send you a long message. Inside it, you will find an <strong>HTTP API Token</strong> that looks something like this:
             </p>
             <div className="ml-11 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
               <p className="font-mono text-sm text-gray-800 break-all">
@@ -88,27 +88,27 @@ export default function BotSetupPage() {
               </p>
             </div>
             <p className="text-gray-600 ml-11 mt-3 font-semibold text-blue-700">
-              👉 Is token ko copy kar lijiye!
+              👉 Please copy this token!
             </p>
           </div>
         </div>
 
         {/* Support / Help Section */}
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 border border-blue-100 text-center">
-          <div className="text-4xl mb-4">🤔</div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Kahi Atak Gaye?</h2>          <p className="text-gray-600 mb-6 max-w-lg mx-auto">
-            Koi baat nahi! Hamari team aapki madad ke liye ready hai. Bas apna Bot Token hamare support email par bhej dijiye, hum aapka bot khud setup kar denge.
+          <div className="text-4xl mb-4"></div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Stuck Somewhere?</h2>          <p className="text-gray-600 mb-6 max-w-lg mx-auto">
+            No worries! Our team is ready to help you. Just send your Bot Token to our support email, and we will set up the bot for you.
           </p>
           
           <a 
-            href="mailto:support@quickcart.com?subject=Need%20Help%20with%20Bot%20Setup&body=Hi%20QuickCart%20Team,%0A%0AI%20am%20stuck%20setting%20up%20my%20bot.%20Here%20is%20my%20Bot%20Token:%0A%0A%5BPASTE%20YOUR%20TOKEN%20HERE%5D%0A%0AMy%20Shop%20Name:%20%0AMy%20Phone%20Number:%20"
+            href="mailto:supportquickcart0gmail.com?subject=Need%20Help%20with%20Bot%20Setup&body=Hi%20QuickCart%20Team,%0A%0AI%20am%20stuck%20setting%20up%20my%20bot.%20Here%20is%20my%20Bot%20Token:%0A%0A%5BPASTE%20YOUR%20TOKEN%20HERE%5D%0A%0AMy%20Shop%20Name:%20%0AMy%20Phone%20Number:%20"
             className="inline-flex items-center justify-center bg-blue-600 text-white px-8 py-3 rounded-xl font-semibold hover:bg-blue-700 transition shadow-lg hover:shadow-xl"
           >
-            📧 Email Support Team
+             Email Support Team
           </a>
           
           <p className="text-sm text-gray-500 mt-4">
-            Hum 24 ghante ke andar reply karte hain.
+            We reply within 24 hours.
           </p>
         </div>
 
