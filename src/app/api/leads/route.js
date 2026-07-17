@@ -36,6 +36,7 @@ export async function POST(request) {
           shop_name: shopName,
           phone,
           email,
+          password: body.password,
           subscription_plan: plan,
           subscription_status: 'trial',
           trial_start_date: trialStartDate.toISOString(),

@@ -7,12 +7,12 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   
-  // Plan default 'pro' rahega, user checkout page par change kar sakega
   const [formData, setFormData] = useState({ 
     name: '', 
     shopName: '', 
     phone: '', 
     email: '', 
+    password: '', // 👈 Password field add kiya
     plan: 'pro' 
   });
 
@@ -24,14 +24,13 @@ export default function SignupPage() {
       const response = await fetch('/api/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(formData) // Password bhi ab backend ko jayega
       });
 
       const result = await response.json();
 
       if (result.success) {
         setSuccess(true);
-        // 2 second baad user ko direct Checkout page par bhej do
         setTimeout(() => {
           router.push(`/checkout?lead_id=${result.data.id}`);
         }, 2000);
@@ -47,8 +46,8 @@ export default function SignupPage() {
   };
 
   if (success) {
-    return (      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
           <div className="text-6xl mb-4 animate-bounce">🎉</div>
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Congratulations!</h1>
           <p className="text-lg text-gray-600 mb-6">
@@ -72,7 +71,7 @@ export default function SignupPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
         <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Start Free Trial</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Your Account</h1>
           <p className="text-gray-600">7 days free + First month 50% off</p>
         </div>
 
@@ -96,8 +95,8 @@ export default function SignupPage() {
               value={formData.shopName}
               onChange={(e) => setFormData({...formData, shopName: e.target.value})}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
-              placeholder="Rahul General Store"            />
-          </div>
+              placeholder="Rahul General Store"
+            />          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
             <input 
@@ -110,7 +109,7 @@ export default function SignupPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email Address *</label>
             <input 
               type="email" 
               required
@@ -120,20 +119,33 @@ export default function SignupPage() {
               placeholder="rahul@example.com"
             />
           </div>
+          
+          {/* 👈 YE NAYA PASSWORD FIELD HAI */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Create Password *</label>
+            <input 
+              type="password" 
+              required
+              minLength={6}
+              value={formData.password}
+              onChange={(e) => setFormData({...formData, password: e.target.value})}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
+              placeholder="Min. 6 characters"
+            />
+          </div>
 
           <button 
             type="submit"
             disabled={loading}
             className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-semibold disabled:bg-gray-400 mt-6"
           >
-            {loading ? 'Processing...' : '🚀 Start 7-Day Free Trial'}
+            {loading ? 'Creating Account...' : '🚀 Start 7-Day Free Trial'}
           </button>
 
           <a 
             href="/landing"
             className="block text-center text-gray-600 hover:text-gray-900 mt-4"
-          >
-            ← Back to Home
+          >            ← Back to Home
           </a>
         </form>
 
