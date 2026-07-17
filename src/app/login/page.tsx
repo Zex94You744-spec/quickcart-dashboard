@@ -1,6 +1,14 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// 👇 YAHAN APNA ADMIN EMAIL DAAL DENA (Jisse tum admin dashboard access karoge)
+const ADMIN_EMAIL = 'admin@quickcart.com'; 
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,13 +19,42 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     
-    // TODO: Yahan baad mein Supabase Auth ya custom login logic aayega
-    // Abhi ke liye hum direct admin dashboard par redirect kar rahe hain demo ke liye
-    
-    setTimeout(() => {
+    try {
+      // 1. Database se user ka record check karo
+      const { data: userData, error } = await supabase
+        .from('leads')
+        .select('email, password')
+        .eq('email', formData.email)
+        .single();
+
+      if (error || !userData) {
+        alert('Account not found. Please sign up first.');
+        setLoading(false);
+        return;
+      }
+
+      // 2. Password match karo (Simple text match for now)
+      if (userData.password !== formData.password) {
+        alert('Incorrect password! Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      // 3. Agar sab sahi hai, toh email localStorage mein save karo
+      localStorage.setItem('userEmail', formData.email);
+
+      // 4. SMART ROUTING: Admin ya Normal User?
+      if (formData.email === ADMIN_EMAIL) {
+        router.push('/admin/leads');
+      } else {
+        router.push('/dashboard');      }
+
+    } catch (error) {
+      console.error('Login error:', error);
+      alert('Something went wrong. Please try again.');
+    } finally {
       setLoading(false);
-      router.push('/admin/leads');
-    }, 1500);
+    }
   };
 
   return (
@@ -25,7 +62,7 @@ export default function LoginPage() {
       <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
-          <p className="text-gray-600">Login to your QuickCart dashboard</p>
+          <p className="text-gray-600">Login to your QuickCart account</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-5">
@@ -58,9 +95,8 @@ export default function LoginPage() {
               <input type="checkbox" className="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
               Remember me
             </label>
-            <a href="#" className="text-blue-600 hover:text-blue-800 font-medium">Forgot password?</a>
+            <a href="/bot-setup" className="text-blue-600 hover:text-blue-800 font-medium">Need Help?</a>
           </div>
-
           <button 
             type="submit"
             disabled={loading}

@@ -12,7 +12,7 @@ export default function SignupPage() {
     shopName: '', 
     phone: '', 
     email: '', 
-    password: '', // 👈 Password field add kiya
+    password: '', 
     plan: 'pro' 
   });
 
@@ -24,13 +24,17 @@ export default function SignupPage() {
       const response = await fetch('/api/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData) // Password bhi ab backend ko jayega
+        body: JSON.stringify(formData)
       });
 
       const result = await response.json();
 
       if (result.success) {
         setSuccess(true);
+        // 👇 User ka email save kar rahe hain taaki baad mein dashboard access kar sake
+        localStorage.setItem('userEmail', formData.email);
+        
+        // 2 second baad user ko direct Checkout page par bhej do
         setTimeout(() => {
           router.push(`/checkout?lead_id=${result.data.id}`);
         }, 2000);
@@ -44,10 +48,10 @@ export default function SignupPage() {
       setLoading(false);
     }
   };
-
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
           <div className="text-6xl mb-4 animate-bounce">🎉</div>
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Congratulations!</h1>
           <p className="text-lg text-gray-600 mb-6">
@@ -92,11 +96,11 @@ export default function SignupPage() {
             <input 
               type="text" 
               required
-              value={formData.shopName}
-              onChange={(e) => setFormData({...formData, shopName: e.target.value})}
+              value={formData.shopName}              onChange={(e) => setFormData({...formData, shopName: e.target.value})}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
               placeholder="Rahul General Store"
-            />          </div>
+            />
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
             <input 
@@ -116,11 +120,9 @@ export default function SignupPage() {
               value={formData.email}
               onChange={(e) => setFormData({...formData, email: e.target.value})}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
-              placeholder="rahul@example.com"
+              placeholder="supportquickcart.com"
             />
           </div>
-          
-          {/* 👈 YE NAYA PASSWORD FIELD HAI */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Create Password *</label>
             <input 
@@ -142,11 +144,8 @@ export default function SignupPage() {
             {loading ? 'Creating Account...' : '🚀 Start 7-Day Free Trial'}
           </button>
 
-          <a 
-            href="/landing"
-            className="block text-center text-gray-600 hover:text-gray-900 mt-4"
-          >            ← Back to Home
-          </a>
+          <a href="/landing" className="block text-center text-gray-600 hover:text-gray-900 mt-4">
+            ← Back to Home          </a>
         </form>
 
         <div className="mt-6 pt-6 border-t border-gray-200 text-center text-sm text-gray-500">
