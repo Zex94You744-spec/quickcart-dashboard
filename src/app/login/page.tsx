@@ -18,6 +18,22 @@ export default function LoginPage() {
   const handleLogin = async (e: any) => {
     e.preventDefault();
     setLoading(true);
+
+  const { data: userData, error } = await supabase
+        .from('leads')
+        .select('email, password')
+        .eq('email', formData.email)
+        .single();
+
+      console.log('Login Debug - Email:', formData.email);
+      console.log('Login Debug - DB Response:', userData);
+      console.log('Login Debug - DB Error:', error);
+
+      if (error || !userData) {
+        alert('Account not found. Please sign up first.');
+        setLoading(false);
+        return;
+      }
     
     try {
       // 1. Database se user ka record check karo
