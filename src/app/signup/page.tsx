@@ -6,6 +6,8 @@ export default function SignupPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  
+  // Plan default 'pro' rahega, user checkout page par change kar sakega
   const [formData, setFormData] = useState({ 
     name: '', 
     shopName: '', 
@@ -22,13 +24,7 @@ export default function SignupPage() {
       const response = await fetch('/api/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name,
-          shopName: formData.shopName,
-          phone: formData.phone,
-          email: formData.email,
-          plan: formData.plan
-        })
+        body: JSON.stringify(formData)
       });
 
       const result = await response.json();
@@ -40,32 +36,32 @@ export default function SignupPage() {
           router.push(`/checkout?lead_id=${result.data.id}`);
         }, 2000);
       } else {
-        alert('Error: ' + (result.error || 'Kuch gadbad ho gayi'));
+        alert('Error: ' + (result.error || 'Something went wrong'));
       }
     } catch (error) {
       alert('Something went wrong. Please try again.');
       console.error('Signup error:', error);
     } finally {
       setLoading(false);
-    }  };
+    }
+  };
 
   if (success) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    return (      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
           <div className="text-6xl mb-4 animate-bounce">🎉</div>
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Congratulations!</h1>
           <p className="text-lg text-gray-600 mb-6">
-            Aapka <span className="font-bold text-blue-600">7-day free trial</span> activate ho gaya hai!
+            Your <span className="font-bold text-blue-600">7-day free trial</span> has been activated!
           </p>
           <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 text-left rounded-r-lg">
-            <p className="font-semibold text-blue-900">Redirecting to Payment...</p>
+            <p className="font-semibold text-blue-900">Redirecting to Checkout...</p>
             <p className="text-sm text-blue-700 mt-1">
-              Aapko 2 second mein Checkout page par le jaya ja raha hai taaki aap apna plan confirm kar sakein.
+              You will be redirected to the checkout page in 2 seconds to confirm your plan.
             </p>
           </div>
           <p className="text-sm text-gray-500">
-            Agar redirect na ho, toh <a href="/landing" className="text-blue-600 underline">yahan click karein</a>.
+            If you are not redirected, <a href="/landing" className="text-blue-600 underline">click here</a>.
           </p>
         </div>
       </div>
@@ -77,12 +73,12 @@ export default function SignupPage() {
       <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
         <div className="text-center mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Start Free Trial</h1>
-          <p className="text-gray-600">7 din free + Pehla mahina 50% off</p>
+          <p className="text-gray-600">7 days free + First month 50% off</p>
         </div>
 
         <form onSubmit={handleSignup} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Aapka Naam *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Your Name *</label>
             <input 
               type="text" 
               required
@@ -93,14 +89,14 @@ export default function SignupPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Shop Ka Naam *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Shop Name *</label>
             <input 
               type="text" 
-              required              value={formData.shopName}
+              required
+              value={formData.shopName}
               onChange={(e) => setFormData({...formData, shopName: e.target.value})}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
-              placeholder="Rahul General Store"
-            />
+              placeholder="Rahul General Store"            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
@@ -124,28 +120,15 @@ export default function SignupPage() {
               placeholder="rahul@example.com"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Choose Plan *</label>
-            <select
-              required
-              value={formData.plan}
-              onChange={(e) => setFormData({...formData, plan: e.target.value})}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
-            >
-              <option value="starter">Starter - ₹499/month</option>
-              <option value="pro">Pro - ₹999/month (Most Popular)</option>
-              <option value="premium">Premium - ₹1999/month</option>
-            </select>
-            <p className="text-xs text-gray-500 mt-1">🎁 Pehla mahina 50% OFF!</p>
-          </div>
 
           <button 
             type="submit"
             disabled={loading}
             className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-semibold disabled:bg-gray-400 mt-6"
           >
-            {loading ? 'Processing...' : ' Start 7-Day Free Trial'}
+            {loading ? 'Processing...' : '🚀 Start 7-Day Free Trial'}
           </button>
+
           <a 
             href="/landing"
             className="block text-center text-gray-600 hover:text-gray-900 mt-4"
@@ -155,9 +138,9 @@ export default function SignupPage() {
         </form>
 
         <div className="mt-6 pt-6 border-t border-gray-200 text-center text-sm text-gray-500">
-          <p>✓ Koi credit card nahi chahiye</p>
-          <p>✓ 7 din bilkul free</p>
-          <p>✓ Pehla mahina 50% off</p>
+          <p>✓ No credit card required</p>
+          <p>✓ 7 days completely free</p>
+          <p>✓ First month 50% off</p>
         </div>
       </div>
     </div>
