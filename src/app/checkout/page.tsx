@@ -13,7 +13,7 @@ const PLANS = [
     name: 'Starter',
     price: 499,
     discountedPrice: 249,
-    description: 'Chhote shops aur shuruat ke liye perfect',
+    description: 'Perfect for small shops and startups',
     features: [
       '✅ 50 Orders per month',
       '✅ Basic Dashboard & Analytics',
@@ -28,7 +28,7 @@ const PLANS = [
     name: 'Pro',
     price: 999,
     discountedPrice: 499,
-    description: 'Growing businesses ke liye best value',
+    description: 'Best value for growing businesses',
     popular: true,
     features: [
       '✅ Unlimited Orders',
@@ -44,10 +44,11 @@ const PLANS = [
     name: 'Premium',
     price: 1999,
     discountedPrice: 999,
-    description: 'Large businesses aur multi-user ke liye',
+    description: 'For large businesses and multi-user teams',
     features: [
       '✅ Everything in Pro',
-      '✅ Multi-user Staff Access',      '✅ Custom Branding (Your Logo)',
+      '✅ Multi-user Staff Access',
+      '✅ Custom Branding (Your Logo)',
       '✅ Priority 24/7 Support',
       '✅ Advanced API Access',
       '✅ Dedicated Account Manager'
