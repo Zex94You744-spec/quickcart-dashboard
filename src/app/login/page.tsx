@@ -35,35 +35,27 @@ export default function LoginPage() {
         return;
       }
     
-    try {
-      // 1. Database se user ka record check karo
-      const { data: userData, error } = await supabase
-        .from('leads')
-        .select('email, password')
-        .eq('email', formData.email)
-        .single();
-
-      if (error || !userData) {
-        alert('Account not found. Please sign up first.');
-        setLoading(false);
-        return;
-      }
-
-      // 2. Password match karo (Simple text match for now)
       if (userData.password !== formData.password) {
         alert('Incorrect password! Please try again.');
         setLoading(false);
         return;
       }
 
-      // 3. Agar sab sahi hai, toh email localStorage mein save karo
       localStorage.setItem('userEmail', formData.email);
 
-      // 4. SMART ROUTING: Admin ya Normal User?
+      // 👇 YE HAI MAIN SECURITY CHECK
+      // Apna asli admin email yahan replace kar dena (e.g., 'tumharaemail@gmail.com')
+      const ADMIN_EMAIL = 'devbusines01@gmail.com'; 
+
       if (formData.email === ADMIN_EMAIL) {
+        // Admin ke liye secure cookie set karo (1 day ke liye valid)
+        document.cookie = "isAdmin=true; path=/; max-age=86400";
         router.push('/admin/leads');
       } else {
-        router.push('/dashboard');      }
+        // Normal user ke liye cookie hata do ya false kar do
+        document.cookie = "isAdmin=false; path=/; max-age=86400";
+        router.push('/dashboard');
+      }
 
     } catch (error) {
       console.error('Login error:', error);
