@@ -18,9 +18,21 @@ export default function LoginPage() {
   const handleLogin = async (e: any) => {
     e.preventDefault();
     setLoading(true);
-    
+
+    // 1. ADMIN CHECK (Direct & 100% Working - Database par depend nahi karta)
+    const ADMIN_EMAIL = 'devbusines01@gmail.com';
+    const ADMIN_PASSWORD = 'TaYOpc9THewup94D6429qC3vxe+fZFKp';
+
+    if (formData.email === ADMIN_EMAIL && formData.password === ADMIN_PASSWORD) {
+      localStorage.setItem('userEmail', formData.email);
+      document.cookie = "isAdmin=true; path=/; max-age=86400"; // Admin cookie set kiya
+      router.push('/admin/leads');
+      setLoading(false);
+      return;
+    }
+
+    // 2. NORMAL USER CHECK (Database se)
     try {
-      // 1. Database se user ka record check karo
       const { data: userData, error } = await supabase
         .from('leads')
         .select('email, password')
@@ -33,29 +45,15 @@ export default function LoginPage() {
         return;
       }
 
-      // 2. Password match karo
       if (userData.password !== formData.password) {
         alert('Incorrect password! Please try again.');
         setLoading(false);
         return;
       }
 
-      // 3. Email save karo
       localStorage.setItem('userEmail', formData.email);
-
-      // 4. SMART ROUTING: Admin ya Normal User?
-      // 👇 YAHAN APNA ASLI ADMIN EMAIL DAAL DENA
-      const ADMIN_EMAIL = 'devbusines01@gmail.com'; 
-
-      if (formData.email === ADMIN_EMAIL) {
-        // Admin ke liye secure cookie set karo
-        document.cookie = "isAdmin=true; path=/; max-age=86400";
-        router.push('/admin/leads');
-      } else {
-        // Normal user ke liye
-        document.cookie = "isAdmin=false; path=/; max-age=86400";
-        router.push('/dashboard');
-      }
+      document.cookie = "isAdmin=false; path=/; max-age=86400"; // Normal user cookie
+      router.push('/dashboard');
 
     } catch (error) {
       console.error('Login error:', error);
