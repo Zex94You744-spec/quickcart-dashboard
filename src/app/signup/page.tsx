@@ -1,7 +1,9 @@
 'use client';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function SignupPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [formData, setFormData] = useState({ 
@@ -33,6 +35,10 @@ export default function SignupPage() {
 
       if (result.success) {
         setSuccess(true);
+        // 2 second baad user ko direct Checkout page par bhej do
+        setTimeout(() => {
+          router.push(`/checkout?lead_id=${result.data.id}`);
+        }, 2000);
       } else {
         alert('Error: ' + (result.error || 'Kuch gadbad ho gayi'));
       }
@@ -41,32 +47,26 @@ export default function SignupPage() {
       console.error('Signup error:', error);
     } finally {
       setLoading(false);
-    }
-  };
+    }  };
 
   if (success) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">          <div className="text-6xl mb-4">🎉</div>
+        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+          <div className="text-6xl mb-4 animate-bounce">🎉</div>
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Congratulations!</h1>
           <p className="text-lg text-gray-600 mb-6">
             Aapka <span className="font-bold text-blue-600">7-day free trial</span> activate ho gaya hai!
           </p>
-          <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-6 text-left">
-            <p className="font-semibold text-green-800">Ab kya hoga?</p>
-            <ul className="mt-2 space-y-1 text-green-700">
-              <li>✓ Hum aapse 24 ghante mein contact karenge</li>
-              <li>✓ Aapka custom Telegram bot setup hoga</li>
-              <li>✓ Dashboard access mil jayega</li>
-              <li>✓ Pehla mahina 50% discount milega</li>
-            </ul>
+          <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 text-left rounded-r-lg">
+            <p className="font-semibold text-blue-900">Redirecting to Payment...</p>
+            <p className="text-sm text-blue-700 mt-1">
+              Aapko 2 second mein Checkout page par le jaya ja raha hai taaki aap apna plan confirm kar sakein.
+            </p>
           </div>
-          <a 
-            href="/landing"
-            className="block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold"
-          >
-            ← Back to Home
-          </a>
+          <p className="text-sm text-gray-500">
+            Agar redirect na ho, toh <a href="/landing" className="text-blue-600 underline">yahan click karein</a>.
+          </p>
         </div>
       </div>
     );
@@ -144,7 +144,7 @@ export default function SignupPage() {
             disabled={loading}
             className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-semibold disabled:bg-gray-400 mt-6"
           >
-            {loading ? 'Processing...' : '🚀 Start 7-Day Free Trial'}
+            {loading ? 'Processing...' : ' Start 7-Day Free Trial'}
           </button>
           <a 
             href="/landing"
