@@ -1,373 +1,205 @@
-'use client';
-import { useState } from 'react';
-
 export default function LandingPage() {
-  const [showModal, setShowModal] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({ name: '', shopName: '', phone: '', email: '' });
-
-  const handleSignup = async (e: any) => {
-    e.preventDefault();
-    setLoading(true);
-    
-    try {
-      const response = await fetch('/api/leads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        alert('🎉 Congratulations!\n\nAapka 7-day free trial activate ho gaya hai!\n\nHum aapse jaldi contact karenge.');
-        setShowModal(false);
-        setFormData({ name: '', shopName: '', phone: '', email: '' });
-      } else {
-        alert('Error: ' + (result.error || 'Kuch gadbad ho gayi'));
-      }
-    } catch (error) {
-      alert('Something went wrong. Please try again.');
-      console.error('Signup error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-white">
-      {/* Header */}
-      <nav className="bg-white shadow-sm sticky top-0 z-40">
+      {/* Navbar */}
+      <nav className="border-b border-gray-100 bg-white/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <span className="text-2xl font-bold text-blue-600">QuickCart</span>
             </div>
-            <div className="hidden md:flex space-x-8">
-              <a href="#features" className="text-gray-700 hover:text-blue-600">Features</a>
-              <a href="#pricing" className="text-gray-700 hover:text-blue-600">Pricing</a>
-              <a href="#how-it-works" className="text-gray-700 hover:text-blue-600">How it Works</a>
-            </div>            <button 
-              onClick={() => window.location.href = '/signup'}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
-            >
-              Start Free Trial
-            </button>
+            <div className="hidden md:flex items-center space-x-8">
+              <a href="#features" className="text-gray-600 hover:text-blue-600 transition">Features</a>
+              <a href="#how-it-works" className="text-gray-600 hover:text-blue-600 transition">How it Works</a>
+              <a href="#pricing" className="text-gray-600 hover:text-blue-600 transition">Pricing</a>
+              <a href="/signup" className="bg-blue-600 text-white px-5 py-2 rounded-lg font-medium hover:bg-blue-700 transition">
+                Start Free Trial
+              </a>
+            </div>
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-blue-50 to-indigo-100 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-              Apne Shop Ko <span className="text-blue-600">Digital</span> Banayein
-            </h1>
-            <p className="text-lg md:text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-              Telegram se orders lein, automatic invoices banayein, aur sales track karein. 
-              Sab kuch ek hi jagah pe!
-            </p>
-            <div className="flex flex-col sm:flex-row justify-center gap-4">
-              <button 
-                onClick={() => window.location.href = '/signup'}
-                className="bg-blue-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-blue-700 transition shadow-lg"
-              >
-                🚀 7 Din Free Trial Shuru Karein
-              </button>
-              <a 
-                href="#how-it-works"
-                className="bg-white text-blue-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-gray-50 transition shadow-lg border-2 border-blue-600"
-              >
-                ▶️ Demo Dekhein
-              </a>
-            </div>
-            <p className="text-sm text-gray-500 mt-4">
-              ✅ Koi credit card nahi chahiye   ✅ 7 din free   ✅ Pehla mahina 50% off
-            </p>
+      <section className="relative pt-20 pb-32 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="inline-flex items-center bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-semibold mb-6 border border-blue-100">
+            🎉 Special Offer: 7 Days Free + First Month 50% Off!
+          </div>
+          <h1 className="text-5xl md:text-6xl font-extrabold text-gray-900 tracking-tight mb-6">
+            Digitize Your Shop in <span className="text-blue-600">Minutes</span>
+          </h1>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-10">
+            Take orders via Telegram, generate automatic invoices, and track your sales in real-time. Everything your business needs, all in one place.
+          </p>
+          <div className="flex flex-col sm:flex-row justify-center gap-4 mb-8">
+            <a 
+              href="/signup" 
+              className="bg-blue-600 text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-blue-700 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+            >
+              🚀 Start 7-Day Free Trial
+            </a>
+            <a 
+              href="#how-it-works" 
+              className="bg-gray-100 text-gray-700 px-8 py-4 rounded-xl text-lg font-semibold hover:bg-gray-200 transition flex items-center justify-center gap-2"
+            >
+              ▶️ See How It Works
+            </a>
+          </div>
+          <div className="flex justify-center items-center gap-6 text-sm text-gray-500 font-medium">
+            <span className="flex items-center gap-1">✓ No credit card required</span>            <span className="flex items-center gap-1">✓ 7 days completely free</span>
+            <span className="flex items-center gap-1">✓ First month 50% off</span>
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-20 bg-white">
+      <section id="features" className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Sab Kuch Jo Aapko Chahiye</h2>
-            <p className="text-lg md:text-xl text-gray-600">Ek complete solution aapke business ke liye</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Everything You Need to Grow</h2>
+            <p className="text-lg text-gray-600">A complete solution designed for modern businesses.</p>
           </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="bg-blue-50 p-8 rounded-xl hover:shadow-lg transition">
-              <div className="text-4xl mb-4">📱</div>
-              <h3 className="text-xl font-bold mb-2">Telegram Orders</h3>
-              <p className="text-gray-600">Customers Telegram pe order bhejein, AI automatically extract karega</p>
-            </div>
-            
-            <div className="bg-green-50 p-8 rounded-xl hover:shadow-lg transition">
-              <div className="text-4xl mb-4">📊</div>
-              <h3 className="text-xl font-bold mb-2">Sales Analytics</h3>
-              <p className="text-gray-600">Real-time charts aur graphs se apna business track karein</p>
-            </div>
-            
-            <div className="bg-purple-50 p-8 rounded-xl hover:shadow-lg transition">
-              <div className="text-4xl mb-4">🧾</div>
-              <h3 className="text-xl font-bold mb-2">Auto PDF Invoices</h3>
-              <p className="text-gray-600">Professional invoices automatically generate aur send honge</p>
-            </div>
-            
-            <div className="bg-yellow-50 p-8 rounded-xl hover:shadow-lg transition">
-              <div className="text-4xl mb-4">📦</div>
-              <h3 className="text-xl font-bold mb-2">Order Tracking</h3>
-              <p className="text-gray-600">Customers ko live tracking link bhejein</p>
-            </div>
-            
-            <div className="bg-red-50 p-8 rounded-xl hover:shadow-lg transition">
-              <div className="text-4xl mb-4"></div>
-              <h3 className="text-xl font-bold mb-2">GST Calculation</h3>
-              <p className="text-gray-600">Automatic GST calculation aur reporting</p>
-            </div>
-            
-            <div className="bg-indigo-50 p-8 rounded-xl hover:shadow-lg transition">
-              <div className="text-4xl mb-4">📥</div>
-              <h3 className="text-xl font-bold mb-2">CSV Export</h3>
-              <p className="text-gray-600">Excel mein data export karein accounting ke liye</p>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[
+              { icon: '📱', title: 'Telegram Orders', desc: 'Customers send orders on Telegram, and our AI automatically extracts the details.' },
+              { icon: '📊', title: 'Sales Analytics', desc: 'Track your business growth with real-time charts and insightful graphs.' },
+              { icon: '🧾', title: 'Auto PDF Invoices', desc: 'Professional, branded invoices are automatically generated and sent to customers.' },
+              { icon: '📦', title: 'Live Order Tracking', desc: 'Share live tracking links with your customers for a premium experience.' },
+              { icon: '🧮', title: 'GST Calculation', desc: 'Automatic GST calculation and detailed reporting for hassle-free accounting.' },
+              { icon: '📥', title: 'CSV Export', desc: 'Export all your sales and order data to Excel with a single click.' }
+            ].map((feature, idx) => (
+              <div key={idx} className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition">
+                <div className="text-4xl mb-4">{feature.icon}</div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">{feature.title}</h3>
+                <p className="text-gray-600">{feature.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* How it Works */}
-      <section id="how-it-works" className="py-20 bg-gray-50">
+      {/* How It Works Section */}
+      <section id="how-it-works" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Kaise Kaam Karta Hai?</h2>
-            <p className="text-lg md:text-xl text-gray-600">3 simple steps mein shuru karein</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">How It Works</h2>
+            <p className="text-lg text-gray-600">Get started in 3 simple steps.</p>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="text-center">              <div className="bg-blue-600 text-white w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">1</div>
-              <h3 className="text-xl font-bold mb-2">Sign Up Karein</h3>
-              <p className="text-gray-600">7 din free trial ke liye register karein</p>
-            </div>
-            
-            <div className="text-center">
-              <div className="bg-blue-600 text-white w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">2</div>
-              <h3 className="text-xl font-bold mb-2">Bot Setup Karein</h3>
-              <p className="text-gray-600">Hum aapka custom Telegram bot setup karenge</p>
-            </div>
-            
-            <div className="text-center">
-              <div className="bg-blue-600 text-white w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">3</div>
-              <h3 className="text-xl font-bold mb-2">Orders Lena Shuru Karein</h3>
-              <p className="text-gray-600">Customers order bhejein, aap track karein</p>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+            {[
+              { step: '1', title: 'Sign Up', desc: 'Register for your 7-day free trial in less than a minute.' },
+              { step: '2', title: 'Bot Setup', desc: 'Follow our simple guide, or let our team set up your custom Telegram bot.' },
+              { step: '3', title: 'Start Taking Orders', desc: 'Share your bot link with customers and watch your digital sales grow.' }
+            ].map((item, idx) => (
+              <div key={idx} className="relative p-8">
+                <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-6">
+                  {item.step}
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-3">{item.title}</h3>                <p className="text-gray-600">{item.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-20 bg-white">
+      <section id="pricing" className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Simple Pricing</h2>
-            <p className="text-lg md:text-xl text-gray-600">7 din free trial + Pehla mahina 50% off!</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Simple, Transparent Pricing</h2>
+            <p className="text-lg text-gray-600">7 days free trial + First month 50% off!</p>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="border-2 border-gray-200 rounded-xl p-8 hover:shadow-xl transition">
-              <h3 className="text-2xl font-bold mb-2">Starter</h3>
-              <p className="text-gray-600 mb-4">Chhote shops ke liye</p>
-              <div className="mb-6">
-                <span className="text-4xl font-bold">₹499</span>
-                <span className="text-gray-600">/month</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-center"><span className="text-green-500 mr-2">✓</span> 50 orders/month</li>
-                <li className="flex items-center"><span className="text-green-500 mr-2">✓</span> Basic dashboard</li>
-                <li className="flex items-center"><span className="text-green-500 mr-2">✓</span> PDF invoices</li>
-                <li className="flex items-center text-gray-400"><span className="mr-2">✗</span> CSV export</li>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            {/* Starter */}
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Starter</h3>
+              <p className="text-gray-500 text-sm mb-6">Perfect for small shops</p>
+              <div className="text-4xl font-bold text-gray-900 mb-6">₹499<span className="text-lg text-gray-500 font-normal">/month</span></div>
+              <ul className="space-y-3 mb-8 text-gray-600">
+                <li className="flex items-center gap-2">✓ 50 orders/month</li>
+                <li className="flex items-center gap-2">✓ Basic dashboard</li>
+                <li className="flex items-center gap-2">✓ PDF invoices</li>
+                <li className="flex items-center gap-2 text-gray-400">✗ CSV export</li>
               </ul>
-              <button 
-                onClick={() => window.location.href = '/signup'}
-                className="w-full bg-gray-200 text-gray-800 py-3 rounded-lg hover:bg-gray-300 transition"
-              >
-                Start Free Trial
-              </button>
+              <a href="/signup" className="block w-full text-center bg-gray-100 text-gray-900 py-3 rounded-xl font-semibold hover:bg-gray-200 transition">Start Free Trial</a>
             </div>
-            <div className="border-2 border-blue-600 rounded-xl p-8 relative hover:shadow-xl transition transform md:scale-105">
-              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-4 py-1 rounded-full text-sm font-semibold">
+
+            {/* Pro */}
+            <div className="bg-white p-8 rounded-2xl shadow-xl border-2 border-blue-600 relative transform md:-translate-y-4">
+              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-4 py-1 rounded-full text-sm font-bold">
                 MOST POPULAR
               </div>
-              <h3 className="text-2xl font-bold mb-2">Pro</h3>
-              <p className="text-gray-600 mb-4">Growing businesses ke liye</p>
-              <div className="mb-6">
-                <span className="text-4xl font-bold">999</span>
-                <span className="text-gray-600">/month</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-center"><span className="text-green-500 mr-2">✓</span> Unlimited orders</li>
-                <li className="flex items-center"><span className="text-green-500 mr-2">✓</span> Advanced dashboard</li>
-                <li className="flex items-center"><span className="text-green-500 mr-2">✓</span> PDF invoices</li>
-                <li className="flex items-center"><span className="text-green-500 mr-2">✓</span> CSV export</li>
-                <li className="flex items-center"><span className="text-green-500 mr-2">✓</span> Email support</li>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Pro</h3>
+              <p className="text-gray-500 text-sm mb-6">Best for growing businesses</p>
+              <div className="text-4xl font-bold text-gray-900 mb-6">₹999<span className="text-lg text-gray-500 font-normal">/month</span></div>
+              <ul className="space-y-3 mb-8 text-gray-600">
+                <li className="flex items-center gap-2">✓ Unlimited orders</li>
+                <li className="flex items-center gap-2">✓ Advanced dashboard</li>
+                <li className="flex items-center gap-2">✓ PDF invoices</li>
+                <li className="flex items-center gap-2">✓ CSV export</li>
+                <li className="flex items-center gap-2">✓ Email support</li>
               </ul>
-              <button 
-                onClick={() => window.location.href = '/signup'}
-                className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition"
-              >
-                Start Free Trial
-              </button>
+              <a href="/signup" className="block w-full text-center bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition">Start Free Trial</a>
             </div>
 
-            <div className="border-2 border-gray-200 rounded-xl p-8 hover:shadow-xl transition">
-              <h3 className="text-2xl font-bold mb-2">Premium</h3>
-              <p className="text-gray-600 mb-4">Large businesses ke liye</p>
-              <div className="mb-6">
-                <span className="text-4xl font-bold">₹1999</span>
-                <span className="text-gray-600">/month</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-center"><span className="text-green-500 mr-2">✓</span> Unlimited orders</li>
-                <li className="flex items-center"><span className="text-green-500 mr-2">✓</span> Multi-user access</li>
-                <li className="flex items-center"><span className="text-green-500 mr-2">✓</span> Custom branding</li>
-                <li className="flex items-center"><span className="text-green-500 mr-2">✓</span> CSV export</li>
-                <li className="flex items-center"><span className="text-green-500 mr-2">✓</span> Priority support</li>
+            {/* Premium */}
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Premium</h3>              <p className="text-gray-500 text-sm mb-6">For large businesses</p>
+              <div className="text-4xl font-bold text-gray-900 mb-6">₹1999<span className="text-lg text-gray-500 font-normal">/month</span></div>
+              <ul className="space-y-3 mb-8 text-gray-600">
+                <li className="flex items-center gap-2">✓ Unlimited orders</li>
+                <li className="flex items-center gap-2">✓ Multi-user access</li>
+                <li className="flex items-center gap-2">✓ Custom branding</li>
+                <li className="flex items-center gap-2">✓ CSV export</li>
+                <li className="flex items-center gap-2">✓ Priority support</li>
               </ul>
-              <button 
-                onClick={() => window.location.href = '/signup'}
-                className="w-full bg-gray-200 text-gray-800 py-3 rounded-lg hover:bg-gray-300 transition"
-              >
-                Start Free Trial
-              </button>
+              <a href="/signup" className="block w-full text-center bg-gray-100 text-gray-900 py-3 rounded-xl font-semibold hover:bg-gray-200 transition">Start Free Trial</a>
             </div>
-          </div>
-
-          <div className="text-center mt-12 bg-yellow-50 p-6 rounded-xl">
-            <p className="text-lg font-semibold text-gray-900">              🎉 Special Offer: 7 Din Free Trial + Pehla Mahina 50% Off!
-            </p>
-            <p className="text-gray-600 mt-2">
-              Trial ke baad automatic normal pricing pe shift hoga. Koi hidden charges nahi.
-            </p>
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="bg-blue-600 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Aaj Hi Shuru Karein!</h2>
-          <p className="text-lg md:text-xl text-blue-100 mb-8">
-            7 din free trial + Pehla mahina 50% discount
-          </p>
-          <button 
-            onClick={() => window.location.href = '/signup'}
-            className="bg-white text-blue-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-gray-100 transition shadow-lg"
-          >
-            🚀 Free Trial Shuru Karein
-          </button>
+      <section className="py-20 bg-blue-600 text-white text-center">
+        <div className="max-w-4xl mx-auto px-4">
+          <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Digitize Your Business?</h2>
+          <p className="text-xl text-blue-100 mb-8">Join hundreds of shops already growing with QuickCart. No hidden charges.</p>
+          <a href="/signup" className="inline-block bg-white text-blue-600 px-8 py-4 rounded-xl text-lg font-bold hover:bg-gray-100 transition shadow-lg">
+            🚀 Start Your Free Trial Today
+          </a>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
+      <footer className="bg-gray-900 text-gray-400 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div>
-              <h3 className="text-xl font-bold mb-4">QuickCart</h3>
-              <p className="text-gray-400">
-                Apne shop ko digital banayein. Telegram se orders lein, track karein, aur grow karein.
-              </p>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+            <div className="col-span-1 md:col-span-2">
+              <span className="text-2xl font-bold text-white mb-4 block">QuickCart</span>
+              <p className="text-sm max-w-xs">Digitize your shop. Take orders via Telegram, track sales, and grow your business effortlessly.</p>
             </div>
             <div>
-              <h3 className="text-xl font-bold mb-4">Quick Links</h3>
-              <ul className="space-y-2">
-                <li><a href="#features" className="text-gray-400 hover:text-white">Features</a></li>
-                <li><a href="#pricing" className="text-gray-400 hover:text-white">Pricing</a></li>
-                <li><a href="#how-it-works" className="text-gray-400 hover:text-white">How it Works</a></li>
+              <h4 className="text-white font-semibold mb-4">Quick Links</h4>
+              <ul className="space-y-2 text-sm">
+                <li><a href="#features" className="hover:text-white transition">Features</a></li>
+                <li><a href="#pricing" className="hover:text-white transition">Pricing</a></li>
+                <li><a href="#how-it-works" className="hover:text-white transition">How it Works</a></li>
+                <li><a href="/bot-setup" className="hover:text-white transition">Bot Setup Guide</a></li>
               </ul>
             </div>
             <div>
-              <h3 className="text-xl font-bold mb-4">Contact</h3>
-              <p className="text-gray-400">
-                Email: support@quickcart.com<br />
-                Phone: +91 XXXXX XXXXX
-              </p>
+              <h4 className="text-white font-semibold mb-4">Contact</h4>
+              <ul className="space-y-2 text-sm">
+                <li>Email: supportquickcart0gmail.com</li>
+                <li>Phone: +91 98765 43210</li>
+              </ul>
             </div>          </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2026 QuickCart. All rights reserved.</p>
+          <div className="border-t border-gray-800 pt-8 text-center text-sm">
+            © {new Date().getFullYear()} QuickCart. All rights reserved.
           </div>
         </div>
       </footer>
-
-      {/* Signup Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-8 max-w-md w-full shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-gray-900">Start Free Trial</h2>
-              <button onClick={() => setShowModal(false)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
-            </div>
-            <p className="text-gray-600 mb-6">7 din free + Pehla mahina 50% off</p>
-            <form onSubmit={handleSignup} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Aapka Naam</label>
-                <input 
-                  type="text" 
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Shop Ka Naam</label>
-                <input 
-                  type="text" 
-                  required
-                  value={formData.shopName}
-                  onChange={(e) => setFormData({...formData, shopName: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                <input 
-                  type="tel" 
-                  required
-                  value={formData.phone}
-                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input                   type="email" 
-                  required
-                  value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
-                />
-              </div>
-              <div className="flex gap-3 pt-4">
-                <button 
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition disabled:bg-gray-400"
-                >
-                  {loading ? 'Processing...' : 'Start Free Trial'}
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 bg-gray-200 text-gray-800 py-3 rounded-lg hover:bg-gray-300 transition"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
