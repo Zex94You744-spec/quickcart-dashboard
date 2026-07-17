@@ -10,11 +10,26 @@ export async function POST(request) {
     const body = await request.json();
     const { name, shopName, phone, email, password, plan } = body;
 
-    // Calculate trial dates (7 days from now)
+    // 1. CHECK: Kya ye email pehle se registered hai?
+    const { data: existingUser } = await supabase
+      .from('leads')
+      .select('id')
+      .eq('email', email)
+      .single();
+
+    if (existingUser) {
+      return NextResponse.json(
+        { success: false, error: 'Ye email pehle se registered hai. Please login karein.' }, 
+        { status: 400 }
+      );
+    }
+
+    // 2. Calculate trial dates (7 days from now)
     const trialStartDate = new Date();
     const trialEndDate = new Date();
     trialEndDate.setDate(trialEndDate.getDate() + 7);
 
+    // 3. Naya user insert karo
     const { data, error } = await supabase
       .from('leads')
       .insert([
@@ -23,7 +38,7 @@ export async function POST(request) {
           shop_name: shopName,
           phone,
           email,
-          password: password || 'default123', // 👈 Password yahan save ho raha hai
+          password: password || 'default123',
           subscription_plan: plan || 'pro',
           subscription_status: 'trial',
           trial_start_date: trialStartDate.toISOString(),
@@ -38,8 +53,6 @@ export async function POST(request) {
       console.error('Supabase insert error:', error);
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
-
-    // TODO: Yahan Telegram notification ka code rehne de (agar hai toh)
 
     return NextResponse.json({ success: true, data });
   } catch (error) {
