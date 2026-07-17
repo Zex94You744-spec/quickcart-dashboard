@@ -18,41 +18,41 @@ export default function LoginPage() {
   const handleLogin = async (e: any) => {
     e.preventDefault();
     setLoading(true);
-
-  const { data: userData, error } = await supabase
+    
+    try {
+      // 1. Database se user ka record check karo
+      const { data: userData, error } = await supabase
         .from('leads')
         .select('email, password')
         .eq('email', formData.email)
         .single();
-
-      console.log('Login Debug - Email:', formData.email);
-      console.log('Login Debug - DB Response:', userData);
-      console.log('Login Debug - DB Error:', error);
 
       if (error || !userData) {
         alert('Account not found. Please sign up first.');
         setLoading(false);
         return;
       }
-    
+
+      // 2. Password match karo
       if (userData.password !== formData.password) {
         alert('Incorrect password! Please try again.');
         setLoading(false);
         return;
       }
 
+      // 3. Email save karo
       localStorage.setItem('userEmail', formData.email);
 
-      // 👇 YE HAI MAIN SECURITY CHECK
-      // Apna asli admin email yahan replace kar dena (e.g., 'tumharaemail@gmail.com')
+      // 4. SMART ROUTING: Admin ya Normal User?
+      // 👇 YAHAN APNA ASLI ADMIN EMAIL DAAL DENA
       const ADMIN_EMAIL = 'devbusines01@gmail.com'; 
 
       if (formData.email === ADMIN_EMAIL) {
-        // Admin ke liye secure cookie set karo (1 day ke liye valid)
+        // Admin ke liye secure cookie set karo
         document.cookie = "isAdmin=true; path=/; max-age=86400";
         router.push('/admin/leads');
       } else {
-        // Normal user ke liye cookie hata do ya false kar do
+        // Normal user ke liye
         document.cookie = "isAdmin=false; path=/; max-age=86400";
         router.push('/dashboard');
       }
@@ -64,7 +64,7 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
-
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
