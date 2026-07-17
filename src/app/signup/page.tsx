@@ -109,7 +109,7 @@ export default function SignupPage() {
               value={formData.phone}
               onChange={(e) => setFormData({...formData, phone: e.target.value})}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
-              placeholder="9876543210"
+              placeholder="support on email"
             />
           </div>
           <div>
@@ -120,7 +120,7 @@ export default function SignupPage() {
               value={formData.email}
               onChange={(e) => setFormData({...formData, email: e.target.value})}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
-              placeholder="supportquickcart.com"
+              placeholder="supportquickcart0@gamil.com"
             />
           </div>
           <div>

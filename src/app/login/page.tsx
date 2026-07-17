@@ -8,7 +8,7 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // 👇 YAHAN APNA ADMIN EMAIL DAAL DENA (Jisse tum admin dashboard access karoge)
-const ADMIN_EMAIL = 'supportquickcart0gamil.com'; 
+const ADMIN_EMAIL = 'devbusines01@gmail.com'; 
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,22 +26,6 @@ export default function LoginPage() {
         .select('email, password')
         .eq('email', formData.email)
         .single();
-
-      const { data: userData, error } = await supabase
-        .from('leads')
-        .select('email, password')
-        .eq('email', formData.email)
-        .single();
-
-      console.log('Login Debug - Email:', formData.email);
-      console.log('Login Debug - DB Response:', userData);
-      console.log('Login Debug - DB Error:', error);
-
-      if (error || !userData) {
-        alert('Account not found. Please sign up first.');
-        setLoading(false);
-        return;
-      }
 
       if (error || !userData) {
         alert('Account not found. Please sign up first.');
@@ -90,7 +74,7 @@ export default function LoginPage() {
               value={formData.email}
               onChange={(e) => setFormData({...formData, email: e.target.value})}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none transition"
-              placeholder="support@quickcart.com"
+              placeholder="supportquickcart0@gmail.com"
             />
           </div>
           
@@ -102,7 +86,7 @@ export default function LoginPage() {
               value={formData.password}
               onChange={(e) => setFormData({...formData, password: e.target.value})}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none transition"
-              placeholder="••••••••"
+              placeholder="contact on email"
             />
           </div>
 
