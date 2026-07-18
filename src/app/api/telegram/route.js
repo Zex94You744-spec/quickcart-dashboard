@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
+
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
 export async function POST(request) {
@@ -17,7 +18,7 @@ export async function POST(request) {
       const messageText = body.message.text;
       const firstName = body.message.from.first_name || 'Unknown';
 
-      console.log('📩 New Message:', messageText);
+      console.log(' New Message:', messageText);
 
       // --- 1. SMART AMOUNT EXTRACTION ---
       let extractedAmount = 0;
@@ -28,7 +29,7 @@ export async function POST(request) {
       }
       
       if (extractedAmount === 0) {
-        const rupeeMatch = messageText.match(/(?:₹|Rs\.?|INR)\s*(\d+)/i);
+        const rupeeMatch = messageText.match(/(?:|Rs\.?|INR)\s*(\d+)/i);
         if (rupeeMatch) {
           extractedAmount = parseInt(rupeeMatch[1], 10);
         }
@@ -46,8 +47,8 @@ export async function POST(request) {
           }
         }
       }
-
       console.log('💰 Extracted Amount:', extractedAmount);
+
       // --- 2. PHONE & ADDRESS EXTRACTION ---
       const phoneMatch = messageText.match(/(\d{10})/);
       const extractedPhone = phoneMatch ? phoneMatch[1] : '';
@@ -55,37 +56,49 @@ export async function POST(request) {
       const addressMatch = messageText.match(/(?:Mumbai|Kardha|Delhi|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/i);
       const extractedAddress = addressMatch ? addressMatch[0] : 'Not provided';
 
-      // --- 3. ITEMS EXTRACTION (Clean & Safe) ---
+      // --- 3. ITEMS EXTRACTION (Ultimate Clean) ---
       let cleanItems = messageText;
+      
+      // Step 1: "Order:" word hatao
       cleanItems = cleanItems.replace(/Order:\s*/i, '');
+      
+      // Step 2: Phone number hatao (exactly 10 digits)
       cleanItems = cleanItems.replace(/\s*\d{10}\s*/g, '');
+      
+      // Step 3: "total: 250" ya "Total: 250" pattern hatao
       cleanItems = cleanItems.replace(/(?:total|Total)\s*:?\s*\d+/gi, '');
+      
+      // Step 4: "250" ya "Rs. 250" ya "Rs 250" pattern hatao  
       cleanItems = cleanItems.replace(/(?:₹|Rs\.?|INR)\s*\d+/gi, '');
+      
+      // Step 5: Cities hatao
       cleanItems = cleanItems.replace(/(?:Mumbai|Kardha|Delhi|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/gi, '');
+      
+      // Step 6: Standalone 3-4 digit numbers hatao (jo amounts hain)
       cleanItems = cleanItems.replace(/,\s*\d{3,4}\s*,/g, ',');
       cleanItems = cleanItems.replace(/,\s*\d{3,4}$/, '');
-
-      // Step 7: Cleanup - extra commas aur spaces hatao
+      
+      // Step 7: AGGRESSIVE CLEANUP
       cleanItems = cleanItems
         .replace(/,,+/g, ',')           // Multiple commas → single comma
-        .replace(/\s*,\s*/g, ', ')      // Comma ke aas-paas standard spacing
-        .replace(/^,|,$/g, '')          // Shuru/end ke commas hatao
+        .replace(/\s*,\s*/g, ', ')      // Comma spacing standardize
+        .replace(/^,|,$/g, '')          // Remove start/end commas
         .replace(/\s+/g, ' ')           // Multiple spaces → single space
-        .replace(/,\s*$/, '')           // End ke trailing commas hatao
         .trim();
       
-      // Final check - agar end mein comma hai toh hata do
+      // Step 8: FINAL FIX - Remove trailing comma after last word
       if (cleanItems.endsWith(',')) {
         cleanItems = cleanItems.slice(0, -1).trim();
       }
       
-      // Agar items bohot chhota ho gaya (< 5 chars), toh original use karo
+      // Remove any remaining trailing commas
+      cleanItems = cleanItems.replace(/,\s*$/, '').trim();
+      
+      // Agar items empty/bohot chhota hai, toh original use karo
       const extractedItems = cleanItems.length > 5 ? cleanItems : messageText.replace(/Order:\s*/i, '').trim();
-
       console.log('📦 Extracted Items:', extractedItems);
 
       // --- 4. SAVE TO DATABASE ---
-      // Variable explicitly defined yahan hai
       const newTrackingCode = 'TRACK' + Date.now().toString().slice(-6);
 
       const { data, error } = await supabase
@@ -105,7 +118,8 @@ export async function POST(request) {
         .select();
 
       if (error) {
-        console.error('❌ Database error:', error);        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+        console.error('❌ Database error:', error);
+        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
       }
 
       console.log('✅ Order saved:', data);
@@ -114,7 +128,7 @@ export async function POST(request) {
       if (BOT_TOKEN && data && data[0]) {
         const trackingLink = `https://quickcart-dashboard-ten.vercel.app/track/${data[0].id}`;
         
-        const replyMessage = `✅ *Order Received!*\n\n📦 *Items:*\n• ${extractedItems}\n\n💰 *Total: ₹${extractedAmount}*\n📍 *Address: ${extractedAddress}*\n📞 *Phone: ${extractedPhone}*\n\n🔗 *Track your order:*\n${trackingLink}\n\n💾 Order saved! Shop will contact you soon.`;
+        const replyMessage = `✅ *Order Received!*\n\n *Items:*\n• ${extractedItems}\n\n💰 *Total: ₹${extractedAmount}*\n📍 *Address: ${extractedAddress}*\n📞 *Phone: ${extractedPhone}*\n\n *Track your order:*\n${trackingLink}\n\n💾 Order saved! Shop will contact you soon.`;
 
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           method: 'POST',
@@ -131,8 +145,7 @@ export async function POST(request) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('❌ Telegram Webhook Error:', error);
+  } catch (error) {    console.error('❌ Telegram Webhook Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
