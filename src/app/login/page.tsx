@@ -1,11 +1,6 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,20 +11,32 @@ export default function LoginPage() {
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
+    
+    // DEBUG ALERT 1: Ye hamesha aayega jab button dabayega
+    alert('Step 1: Login button dabaya gaya! Email: ' + email);
     setLoading(true);
     setError('');
 
-    // --- INSTANT ADMIN BYPASS ---
-    if (email.trim() === 'devbusines01@gmail.com' && password === 'TaYOpc9THewup94D6429qC3vxe+fZFKp') {
-      localStorage.setItem('userEmail', email.trim());
-      localStorage.setItem('userRole', 'admin');
-      router.push('/admin/dashboard');
-      setLoading(false);
-      return;
-    }
-    // ----------------------------
-
     try {
+      // DEBUG ALERT 2: Admin check
+      if (email.trim() === 'devbusines01@gmail.com' && password === 'TaYOpc9THewup94D6429qC3vxe+fZFKp') {
+        alert('Step 2: Admin credentials match ho gaye! Redirecting...');
+        localStorage.setItem('userEmail', 'devbusines01@gmail.com');
+        localStorage.setItem('userRole', 'admin');
+        
+        // Window location use karte hain agar router.push kaam na kare
+        window.location.href = '/admin/dashboard';
+        return;
+      }
+
+      alert('Step 3: Admin nahi hai, database check kar rahe hain...');
+      
+      // Yahan se normal user login ka code hai (agar tu admin se login kar raha hai toh ye skip ho jayega)
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+      const supabase = createClient(supabaseUrl, supabaseKey);
+
       const { data: userData, error: userError } = await supabase
         .from('leads')
         .select('*')
@@ -37,26 +44,26 @@ export default function LoginPage() {
         .single();
 
       if (userError || !userData) {
+        alert('Step 4: User database mein nahi mila!');
         setError('Invalid email or password');
         setLoading(false);
-        return;
-      }
+        return;      }
 
       if (String(userData.password).trim() !== String(password).trim()) {
+        alert('Step 5: Password match nahi hua!');
         setError('Invalid email or password');
         setLoading(false);
         return;
       }
+
+      alert('Step 6: Login successful! Redirecting to User Dashboard...');
       localStorage.setItem('userEmail', email.trim());
       localStorage.setItem('userRole', userData.role || 'user');
+      window.location.href = '/dashboard';
 
-      if (userData.role === 'admin') {
-        router.push('/admin/dashboard');
-      } else {
-        router.push('/dashboard');
-      }
     } catch (err: any) {
-      setError('An error occurred. Please try again.');
+      alert('Step 7: Koi Error aaya! ' + err.message);
+      setError('An error occurred: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -84,19 +91,19 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder="devbusines01@gmail.com"
               required
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition"
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Password *</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"              required
+              placeholder="example@123"
+              required
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition"
             />
           </div>
