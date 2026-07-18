@@ -16,56 +16,47 @@ export default function LoginPage() {
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    console.log('🔵 Login attempt started for:', email);
     setLoading(true);
     setError('');
 
+    // --- INSTANT ADMIN BYPASS ---
+    if (email.trim() === 'devbusines01@gmail.com' && password === 'TaYOpc9THewup94D6429qC3vxe+fZFKp') {
+      localStorage.setItem('userEmail', email.trim());
+      localStorage.setItem('userRole', 'admin');
+      router.push('/admin/dashboard');
+      setLoading(false);
+      return;
+    }
+    // ----------------------------
+
     try {
-      // 1. User ko database mein dhundo
-      console.log('🔵 Fetching user from database...');
       const { data: userData, error: userError } = await supabase
         .from('leads')
         .select('*')
-        .eq('email', email.trim()) // .trim() se accidental spaces hat jayenge
+        .eq('email', email.trim())
         .single();
 
       if (userError || !userData) {
-        console.log('🔴 User not found or error:', userError);
         setError('Invalid email or password');
         setLoading(false);
         return;
       }
 
-      console.log('🟢 User found:', userData.email);
-      console.log('🟢 DB Password:', userData.password, '| Input Password:', password);
-
-      // 2. Password verify karo (Case-sensitive aur spaces hata kar)
-      const dbPass = String(userData.password).trim();
-      const inputPass = String(password).trim();
-
-      if (dbPass !== inputPass) {
-        console.log('🔴 Password mismatch!');
+      if (String(userData.password).trim() !== String(password).trim()) {
         setError('Invalid email or password');
         setLoading(false);
-        return;      }
-
-      console.log('🟢 Password matched!');
-
-      // 3. Email ko localStorage mein save karo
+        return;
+      }
       localStorage.setItem('userEmail', email.trim());
-      console.log('🟢 Email saved to localStorage');
+      localStorage.setItem('userRole', userData.role || 'user');
 
-      // 4. ROLE-BASED REDIRECT
-      if (userData.role === 'admin' || email.trim() === 'admin@quickcart.com') {
-        console.log('🟢 Redirecting to Admin Dashboard...');
+      if (userData.role === 'admin') {
         router.push('/admin/dashboard');
       } else {
-        console.log('🟢 Redirecting to User Dashboard...');
         router.push('/dashboard');
       }
     } catch (err: any) {
-      console.error('🔴 CRITICAL ERROR:', err);
-      setError('An error occurred: ' + err.message);
+      setError('An error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -88,28 +79,24 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email Address *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Email Address *</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              required              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition"
+              required
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Password *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Password *</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
+              placeholder="••••••••"              required
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition"
             />
           </div>
