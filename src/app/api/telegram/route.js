@@ -25,18 +25,20 @@ export async function POST(request) {
       console.log('👤 From user:', firstName, '(ID:', userId, ')');
 
       // Smart Amount Extraction: "total: 650" ya "₹650" ko dhund kar number nikalega
+      // Smart Amount Extraction
       const amountMatch = messageText.match(/(?:total|Total|₹)\s*:?\s*(\d+)/i);
       const extractedAmount = amountMatch ? parseInt(amountMatch[1], 10) : 0;
 
-      // Order ko database mein save karo
+      // Order ko database mein save karo (WITH chat_id)
       const { data, error } = await supabase
         .from('orders')
         .insert([
           {
             customer_name: firstName,
             items: messageText,
-            amount: extractedAmount, // 👈 Ab sahi amount save hoga!
-            status: 'Pending'
+            amount: extractedAmount,
+            status: 'Pending',
+            telegram_chat_id: chatId // 👈 Ye add kiya taaki customer ko message bhej sakein
           }
         ])
         .select();

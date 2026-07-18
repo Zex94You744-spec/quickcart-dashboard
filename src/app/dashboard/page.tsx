@@ -42,12 +42,38 @@ export default function UserDashboard() {
   }
 
   async function updateOrderStatus(orderId: string, newStatus: string) {
+    // 1. Pehle order ka chat_id fetch karo
+    const { data: orderData } = await supabase
+      .from('orders')
+      .select('telegram_chat_id, customer_name')
+      .eq('id', orderId)
+      .single();
+
+    // 2. Status update karo
     const { error } = await supabase
       .from('orders')
       .update({ status: newStatus })
       .eq('id', orderId);
     
-    if (!error) {      const { data: ordersData } = await supabase
+    if (!error) {
+      // 3. Customer ko Telegram message bhejo
+      if (orderData?.telegram_chat_id) {
+        const message = newStatus === 'Completed' 
+          ? `✅ Dhanyawad ${orderData.customer_name}! Aapka order confirm ho gaya hai. Hum jald hi deliver karenge.`
+          : `❌ Maaf kijiye ${orderData.customer_name}, aapka order reject ho gaya hai. Kripya dobara order karein ya support se contact karein.`;
+        
+        await fetch('/api/telegram/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chatId: orderData.telegram_chat_id,
+            message: message
+          })
+        });
+      }
+
+      // 4. Dashboard refresh karo
+      const { data: ordersData } = await supabase
         .from('orders')
         .select('*')
         .order('created_at', { ascending: false })

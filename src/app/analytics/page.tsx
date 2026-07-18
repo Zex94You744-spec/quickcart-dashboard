@@ -34,7 +34,7 @@ export default function AnalyticsPage() {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Sales Analytics 📊</h1>
-            <p className="text-gray-600">Track your store's performance over time.</p>
+            <p className="text-gray-600">Track your store performance over time.</p>
           </div>
           <button onClick={() => router.push('/dashboard')} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition">
             ← Back to Dashboard
@@ -57,29 +57,29 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Simple CSS Bar Chart */}
+        {/* Revenue Chart */}
         <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">Recent Orders Revenue</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-6">Order Revenue Breakdown</h2>
           {orders.length === 0 ? (
             <p className="text-gray-500 text-center py-8">No order data available yet.</p>
           ) : (
             <div className="space-y-4">
-              {orders.slice(-10).reverse().map((order, idx) => {
+              {orders.slice(-10).reverse().map((order) => {
                 const widthPercent = ((Number(order.amount) || 0) / maxAmount) * 100;
                 return (
                   <div key={order.id} className="flex items-center gap-4">
-                    <div className="w-24 text-sm text-gray-500 truncate">
+                    <div className="w-32 text-sm text-gray-700 font-medium truncate">
                       {order.customer_name}
                     </div>
-                    <div className="flex-1 bg-gray-100 rounded-full h-8 overflow-hidden relative">
+                    <div className="flex-1 bg-gray-100 rounded-full h-10 overflow-hidden relative">
                       <div 
-                        className="bg-blue-600 h-full rounded-full flex items-center justify-end pr-3 transition-all duration-500"
-                        style={{ width: `${Math.max(widthPercent, 5)}%` }}
+                        className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full flex items-center justify-end pr-4 transition-all duration-500"
+                        style={{ width: `${Math.max(widthPercent, 8)}%` }}
                       >
-                        <span className="text-white text-xs font-bold">₹{order.amount || 0}</span>
+                        <span className="text-white text-sm font-bold">₹{order.amount || 0}</span>
                       </div>
                     </div>
-                    <div className="w-20 text-xs text-gray-400 text-right">
+                    <div className="w-24 text-xs text-gray-500 text-right">
                       {new Date(order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
                     </div>
                   </div>
