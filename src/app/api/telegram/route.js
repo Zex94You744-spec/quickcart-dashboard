@@ -24,6 +24,10 @@ export async function POST(request) {
       console.log('📩 New Telegram Message:', messageText);
       console.log('👤 From user:', firstName, '(ID:', userId, ')');
 
+      // Smart Amount Extraction: "total: 650" ya "₹650" ko dhund kar number nikalega
+      const amountMatch = messageText.match(/(?:total|Total|₹)\s*:?\s*(\d+)/i);
+      const extractedAmount = amountMatch ? parseInt(amountMatch[1], 10) : 0;
+
       // Order ko database mein save karo
       const { data, error } = await supabase
         .from('orders')
@@ -31,7 +35,7 @@ export async function POST(request) {
           {
             customer_name: firstName,
             items: messageText,
-            amount: 0, // Abhi ke liye 0, baad mein extract karenge
+            amount: extractedAmount, // 👈 Ab sahi amount save hoga!
             status: 'Pending'
           }
         ])

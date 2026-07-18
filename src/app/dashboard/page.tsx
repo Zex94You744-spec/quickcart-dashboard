@@ -49,6 +49,23 @@ export default function UserDashboard() {
       setLoading(false);
     }  }
 
+  async function updateOrderStatus(orderId: string, newStatus: string) {
+    const { error } = await supabase
+      .from('orders')
+      .update({ status: newStatus })
+      .eq('id', orderId);
+    
+    if (!error) {
+      // Status update hone ke baad data refresh karo
+      const { data: ordersData } = await supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+      if (ordersData) setOrders(ordersData);
+    }
+  }
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-600">Loading your business dashboard...</div>;
   }
@@ -153,6 +170,13 @@ export default function UserDashboard() {
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <a href="/analytics" className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:border-indigo-300 hover:shadow-md transition flex items-center gap-4 group">
+            <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition">📊</div>
+            <div>
+              <h3 className="font-bold text-gray-900">View Analytics</h3>
+              <p className="text-sm text-gray-500">Sales charts & insights</p>
+            </div>
+          </a>
           <a href="/bot-setup" className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:border-blue-300 hover:shadow-md transition flex items-center gap-4 group">
             <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition">⚙️</div>
             <div>
@@ -167,13 +191,6 @@ export default function UserDashboard() {
               <p className="text-sm text-gray-500">Get help from our team</p>
             </div>
           </a>
-          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 opacity-60 cursor-not-allowed flex items-center gap-4">
-            <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-2xl">📊</div>
-            <div>
-              <h3 className="font-bold text-gray-900">Export Data (CSV)</h3>
-              <p className="text-sm text-gray-500">Available in Pro & Premium</p>
-            </div>
-          </div>
         </div>
 
         {/* Recent Orders Table (REAL DATA) */}
@@ -198,6 +215,7 @@ export default function UserDashboard() {
                     <th className="px-6 py-4">Amount</th>
                     <th className="px-6 py-4">Status</th>
                     <th className="px-6 py-4">Date</th>
+                    <th className="px-6 py-4">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-sm">
@@ -211,18 +229,37 @@ export default function UserDashboard() {
                       <td className="px-6 py-4 font-semibold text-gray-900">₹{order.amount || 0}</td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                          order.status === 'Completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                          order.status === 'Completed' ? 'bg-green-100 text-green-700' : 
+                          order.status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
                         }`}>
-                          {order.status === 'Completed' ? '✓ ' : '⏳ '}{order.status}
+                          {order.status === 'Completed' ? '✓ ' : order.status === 'Rejected' ? '✗ ' : '⏳ '}{order.status}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-gray-500">{formatDate(order.created_at)}</td>
+                      <td className="px-6 py-4">
+                        {order.status === 'Pending' && (
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => updateOrderStatus(order.id, 'Completed')}
+                              className="text-xs bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700 transition font-medium"
+                            >
+                              ✅ Confirm
+                            </button>
+                            <button 
+                              onClick={() => updateOrderStatus(order.id, 'Rejected')}
+                              className="text-xs bg-red-100 text-red-700 px-3 py-1.5 rounded hover:bg-red-200 transition font-medium"
+                            >
+                              ❌ Reject
+                            </button>
+                          </div>
+                        )}
+                        {order.status !== 'Pending' && (
+                          <span className="text-xs text-gray-400 font-medium">Processed</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
-          )}
           
           <div className="px-6 py-4 bg-blue-50/50 border-t border-blue-100">
             <p className="text-sm text-blue-700 flex items-start gap-2">
