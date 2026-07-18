@@ -14,31 +14,31 @@ export async function POST(request) {
     const body = await request.json();
     console.log('📦 Full webhook payload:', JSON.stringify(body, null, 2));
     
-    // Check karo ki ye valid message hai
     if (body.message && body.message.text) {
-      const chatId = body.message.chat.id;
+      const chatId = body.message.chat.id; // 👈 Customer ka Telegram ID
       const messageText = body.message.text;
       const firstName = body.message.from.first_name || 'Unknown';
       const userId = body.message.from.id;
 
       console.log('📩 New Telegram Message:', messageText);
-      console.log('👤 From user:', firstName, '(ID:', userId, ')');
+      console.log('👤 From user:', firstName, '(Chat ID:', chatId, ')');
 
       // Smart Amount Extraction: "total: 650" ya "₹650" ko dhund kar number nikalega
-      // Smart Amount Extraction
       const amountMatch = messageText.match(/(?:total|Total|₹)\s*:?\s*(\d+)/i);
       const extractedAmount = amountMatch ? parseInt(amountMatch[1], 10) : 0;
 
-      // Order ko database mein save karo (WITH chat_id)
+      console.log('💰 Extracted Amount:', extractedAmount);
+
+      // Order ko database mein save karo (AB CHAT ID BHI SAVE HOGA)
       const { data, error } = await supabase
         .from('orders')
         .insert([
           {
             customer_name: firstName,
+            customer_chat_id: chatId, // 👈 Ye naya column hai
             items: messageText,
-            amount: extractedAmount,
-            status: 'Pending',
-            telegram_chat_id: chatId // 👈 Ye add kiya taaki customer ko message bhej sakein
+            amount: extractedAmount, // 👈 Ab sahi amount save hoga!
+            status: 'Pending'
           }
         ])
         .select();
