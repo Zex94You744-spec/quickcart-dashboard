@@ -4,7 +4,6 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
-
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
 export async function POST(request) {
@@ -18,18 +17,16 @@ export async function POST(request) {
       const messageText = body.message.text;
       const firstName = body.message.from.first_name || 'Unknown';
 
-      console.log(' New Message:', messageText);
+      console.log('📩 New Message:', messageText);
 
       // --- 1. SMART AMOUNT EXTRACTION ---
       let extractedAmount = 0;
       
-      // Try 1: "total: 650" ya "Total: 650"
       const totalMatch = messageText.match(/(?:total|Total)\s*:?\s*(\d+)/i);
       if (totalMatch) {
         extractedAmount = parseInt(totalMatch[1], 10);
       }
       
-      // Try 2: "₹650" ya "Rs. 650" ya "Rs 650"
       if (extractedAmount === 0) {
         const rupeeMatch = messageText.match(/(?:₹|Rs\.?|INR)\s*(\d+)/i);
         if (rupeeMatch) {
@@ -37,22 +34,20 @@ export async function POST(request) {
         }
       }
       
-      // Try 3: Fallback (Last valid number, phone number ko ignore karke)
       if (extractedAmount === 0) {
         const numbers = messageText.match(/\d+/g);
         if (numbers && numbers.length > 0) {
           for (let i = numbers.length - 1; i >= 0; i--) {
             const num = parseInt(numbers[i], 10);
-            // Phone number 10 digit ka hota hai (1 billion se bada), isliye usko skip karo
             if (num < 1000000000 && num > 0) {
               extractedAmount = num;
               break;
-            }          }
+            }
+          }
         }
       }
 
       console.log('💰 Extracted Amount:', extractedAmount);
-
       // --- 2. PHONE & ADDRESS EXTRACTION ---
       const phoneMatch = messageText.match(/(\d{10})/);
       const extractedPhone = phoneMatch ? phoneMatch[1] : '';
@@ -60,43 +55,29 @@ export async function POST(request) {
       const addressMatch = messageText.match(/(?:Mumbai|Kardha|Delhi|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/i);
       const extractedAddress = addressMatch ? addressMatch[0] : 'Not provided';
 
-      // --- 3. ITEMS EXTRACTION (Better Logic) ---
+      // --- 3. ITEMS EXTRACTION (Clean & Safe) ---
       let cleanItems = messageText;
-      
-      // Step 1: "Order:" word hatao
       cleanItems = cleanItems.replace(/Order:\s*/i, '');
-      
-      // Step 2: Phone number hatao (exactly 10 digits)
       cleanItems = cleanItems.replace(/\s*\d{10}\s*/g, '');
-      
-      // Step 3: "total: 250" ya "Total: 250" pattern hatao
       cleanItems = cleanItems.replace(/(?:total|Total)\s*:?\s*\d+/gi, '');
-      
-      // Step 4: "250" ya "Rs. 250" ya "Rs 250" pattern hatao  
       cleanItems = cleanItems.replace(/(?:₹|Rs\.?|INR)\s*\d+/gi, '');
-      
-      // Step 5: Cities hatao
       cleanItems = cleanItems.replace(/(?:Mumbai|Kardha|Delhi|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/gi, '');
-      
-      // Step 6: Standalone 3-4 digit numbers hatao (jo amounts hain)
-      // Lekin quantity ke numbers ko mat hatao (jaise "1kg" ya "2kg")
       cleanItems = cleanItems.replace(/,\s*\d{3,4}\s*,/g, ',');
       cleanItems = cleanItems.replace(/,\s*\d{3,4}$/, '');
       
-      // Step 7: Cleanup - extra commas aur spaces hatao
       cleanItems = cleanItems
-        .replace(/,,+/g, ',')           // Multiple commas → single comma
-        .replace(/\s*,\s*/g, ', ')      // Comma ke aas-paas standard spacing
-        .replace(/^,|,$/g, '')          // Shuru/end ke commas hatao
-        .replace(/\s+/g, ' ')           // Multiple spaces → single space
+        .replace(/,,+/g, ',')
+        .replace(/\s*,\s*/g, ', ')
+        .replace(/^,|,$/g, '')
+        .replace(/\s+/g, ' ')
         .trim();
       
-      // Agar items bohot chhota ho gaya (< 5 chars), toh original use karo
       const extractedItems = cleanItems.length > 5 ? cleanItems : messageText.replace(/Order:\s*/i, '').trim();
+      console.log('📦 Extracted Items:', extractedItems);
 
-      console.log(' Extracted Items:', extractedItems);
-
-      // --- 4. SAVE TO DATABASE ---      const trackingCode = 'TRACK' + Date.now().toString().slice(-6);
+      // --- 4. SAVE TO DATABASE ---
+      // Variable explicitly defined yahan hai
+      const newTrackingCode = 'TRACK' + Date.now().toString().slice(-6);
 
       const { data, error } = await supabase
         .from('orders')
@@ -108,15 +89,14 @@ export async function POST(request) {
             amount: extractedAmount,
             address: extractedAddress,
             phone: extractedPhone,
-            tracking_code: trackingCode,
+            tracking_code: newTrackingCode,
             status: 'Pending'
           }
         ])
         .select();
 
       if (error) {
-        console.error('❌ Database error:', error);
-        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+        console.error('❌ Database error:', error);        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
       }
 
       console.log('✅ Order saved:', data);
@@ -125,7 +105,7 @@ export async function POST(request) {
       if (BOT_TOKEN && data && data[0]) {
         const trackingLink = `https://quickcart-dashboard-ten.vercel.app/track/${data[0].id}`;
         
-        const replyMessage = `✅ *Order Received!*\n\n *Items:*\n• ${extractedItems}\n\n *Total: ₹${extractedAmount}*\n📍 *Address: ${extractedAddress}*\n📞 *Phone: ${extractedPhone}*\n\n🔗 *Track your order:*\n${trackingLink}\n\n Order saved! Shop will contact you soon.`;
+        const replyMessage = `✅ *Order Received!*\n\n📦 *Items:*\n• ${extractedItems}\n\n💰 *Total: ₹${extractedAmount}*\n📍 *Address: ${extractedAddress}*\n📞 *Phone: ${extractedPhone}*\n\n🔗 *Track your order:*\n${trackingLink}\n\n💾 Order saved! Shop will contact you soon.`;
 
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           method: 'POST',
@@ -145,4 +125,5 @@ export async function POST(request) {
   } catch (error) {
     console.error('❌ Telegram Webhook Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  }}
+  }
+}
