@@ -1,3 +1,6 @@
+// 👇 YE LINE BAHUT ZARURI HAI: Next.js ko Node.js runtime use karne ke liye force karti hai
+export const runtime = 'nodejs';
+
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import PDFDocument from 'pdfkit';
@@ -10,6 +13,7 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 export async function POST(request) {
   try {
     const { orderId, chatId } = await request.json();
+    console.log('🧾 Generating invoice for order:', orderId, 'chatId:', chatId);
 
     // 1. Order details fetch karo
     const { data: order, error } = await supabase
@@ -19,13 +23,15 @@ export async function POST(request) {
       .single();
 
     if (error || !order) {
+      console.error('Order not found:', error);
       return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
     }
 
-    // 2. PDF Generate karo (In-memory)
+    // 2. PDF Generate karo (In-memory Buffer)
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
     const chunks = [];
-    doc.on('data', chunk => chunks.push(chunk));
+    
+    doc.on('data', (chunk) => chunks.push(chunk));
     
     const pdfPromise = new Promise((resolve) => {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -41,8 +47,7 @@ export async function POST(request) {
     doc.fontSize(12).font('Helvetica-Bold').text('Bill To:');
     doc.font('Helvetica').text(order.customer_name || 'Customer');
     if (order.phone) doc.text(`Phone: ${order.phone}`);
-    if (order.address) doc.text(`Address: ${order.address}`);
-    doc.moveDown(1);
+    if (order.address) doc.text(`Address: ${order.address}`);    doc.moveDown(1);
     
     doc.text('------------------------------------------------');
     doc.moveDown(0.5);
@@ -67,6 +72,7 @@ export async function POST(request) {
     doc.end(); // PDF generation complete karo
 
     const pdfBuffer = await pdfPromise;
+    console.log('✅ PDF Buffer generated, size:', pdfBuffer.length, 'bytes');
 
     // 3. Telegram par PDF bhejo
     if (BOT_TOKEN && chatId) {
@@ -75,7 +81,7 @@ export async function POST(request) {
       
       formData.append('chat_id', chatId);
       formData.append('document', blob, `Invoice_${order.id.slice(0, 8).toUpperCase()}.pdf`);
-      formData.append('caption', `🧾 *Here is your invoice for Order #${order.id.slice(0, 8).toUpperCase()}*\n\nTotal Paid: Rs. ${total}\n\nThanks for shopping with us! 🙏`);
+      formData.append('caption', `🧾 *Here is your invoice for Order #${order.id.slice(0, 8).toUpperCase()}*\n\nSubtotal: Rs. ${subtotal}\nGST (18%): Rs. ${gst}\n*Total Paid: Rs. ${total}*\n\nThanks for shopping with us! 🙏`);
       formData.append('parse_mode', 'Markdown');
 
       const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
@@ -84,9 +90,12 @@ export async function POST(request) {
       });
 
       const tgResult = await response.json();
-      console.log('📄 Telegram PDF sent:', tgResult.ok ? 'Success' : tgResult);
+      if (tgResult.ok) {
+        console.log('📄 Telegram PDF sent successfully!');
+      } else {
+        console.error('❌ Telegram sendDocument failed:', tgResult);
+      }
     }
-
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('❌ PDF Generation Error:', error);
