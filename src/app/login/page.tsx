@@ -16,42 +16,56 @@ export default function LoginPage() {
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
+    console.log('🔵 Login attempt started for:', email);
     setLoading(true);
     setError('');
 
     try {
       // 1. User ko database mein dhundo
+      console.log('🔵 Fetching user from database...');
       const { data: userData, error: userError } = await supabase
         .from('leads')
         .select('*')
-        .eq('email', email)
+        .eq('email', email.trim()) // .trim() se accidental spaces hat jayenge
         .single();
 
       if (userError || !userData) {
+        console.log('🔴 User not found or error:', userError);
         setError('Invalid email or password');
         setLoading(false);
         return;
       }
 
-      // 2. Password verify karo (plain text comparison for now)
-      if (userData.password !== password) {
+      console.log('🟢 User found:', userData.email);
+      console.log('🟢 DB Password:', userData.password, '| Input Password:', password);
+
+      // 2. Password verify karo (Case-sensitive aur spaces hata kar)
+      const dbPass = String(userData.password).trim();
+      const inputPass = String(password).trim();
+
+      if (dbPass !== inputPass) {
+        console.log('🔴 Password mismatch!');
         setError('Invalid email or password');
         setLoading(false);
-        return;
-      }
+        return;      }
+
+      console.log('🟢 Password matched!');
 
       // 3. Email ko localStorage mein save karo
-      localStorage.setItem('userEmail', email);
+      localStorage.setItem('userEmail', email.trim());
+      console.log('🟢 Email saved to localStorage');
 
       // 4. ROLE-BASED REDIRECT
-      if (userData.role === 'admin' || email === 'admin@quickcart.com') {
-        // Admin hai → Admin Dashboard par jao
+      if (userData.role === 'admin' || email.trim() === 'admin@quickcart.com') {
+        console.log('🟢 Redirecting to Admin Dashboard...');
         router.push('/admin/dashboard');
-      } else {        // Shop Owner hai → User Dashboard par jao
+      } else {
+        console.log('🟢 Redirecting to User Dashboard...');
         router.push('/dashboard');
       }
-    } catch (err) {
-      setError('An error occurred. Please try again.');
+    } catch (err: any) {
+      console.error('🔴 CRITICAL ERROR:', err);
+      setError('An error occurred: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -82,8 +96,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition"
+              required              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition"
             />
           </div>
 
@@ -96,18 +109,9 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              required              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition"
+              required
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition"
             />
-          </div>
-
-          <div className="flex items-center justify-between text-sm">
-            <label className="flex items-center text-gray-600 cursor-pointer">
-              <input type="checkbox" className="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-600" />
-              Remember me
-            </label>
-            <a href="/forgot-password" className="text-blue-600 hover:text-blue-800 font-medium">
-              Forgot password?
-            </a>
           </div>
 
           <button
