@@ -85,12 +85,15 @@ export async function POST(request) {
         .replace(/^,|,$/g, '')          // Remove start/end commas
         .replace(/\s+/g, ' ')           // Multiple spaces → single space
         .trim();
-      
-      // Step 8: FINAL FIX - Remove trailing comma after last word
+
+      // Step 8: FINAL CLEANUP - Remove trailing comma
       if (cleanItems.endsWith(',')) {
         cleanItems = cleanItems.slice(0, -1).trim();
       }
+      cleanItems = cleanItems.replace(/,\s*$/, '').trim();
       
+      const extractedItems = cleanItems.length > 5 ? cleanItems : messageText.replace(/Order:\s*/i, '').trim();
+
       // Remove any remaining trailing commas
       cleanItems = cleanItems.replace(/,\s*$/, '').trim();
       
@@ -125,10 +128,14 @@ export async function POST(request) {
       console.log('✅ Order saved:', data);
 
       // --- 5. SEND REPLY TO CUSTOMER ---
+      // --- 5. SEND REPLY TO CUSTOMER ---
       if (BOT_TOKEN && data && data[0]) {
         const trackingLink = `https://quickcart-dashboard-ten.vercel.app/track/${data[0].id}`;
         
-        const replyMessage = `✅ *Order Received!*\n\n *Items:*\n• ${extractedItems}\n\n💰 *Total: ₹${extractedAmount}*\n📍 *Address: ${extractedAddress}*\n📞 *Phone: ${extractedPhone}*\n\n *Track your order:*\n${trackingLink}\n\n💾 Order saved! Shop will contact you soon.`;
+        // Clean items for reply (remove trailing comma)
+        const cleanItemsForReply = extractedItems.replace(/,\s*$/, '').trim();
+        
+        const replyMessage = `✅ *Order Received!*\n\n *Items:*\n• ${cleanItemsForReply}\n\n💰 *Total: ₹${extractedAmount}*\n📍 *Address: ${extractedAddress}*\n *Phone: ${extractedPhone}*\n\n🔗 *Track your order:*\n${trackingLink}\n\n💾 Order saved! Shop will contact you soon.`;
 
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           method: 'POST',
