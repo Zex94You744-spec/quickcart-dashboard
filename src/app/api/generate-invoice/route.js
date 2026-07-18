@@ -1,121 +1,95 @@
 import { NextResponse } from 'next/server';
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { createClient } from '@supabase/supabase-js';
+import PDFDocument from 'pdfkit';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
 export async function POST(request) {
   try {
-    const { order } = await request.json();
-    
-    const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([595, 842]);
-    const { width, height } = page.getSize();
-    
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    
-    // Header
-    page.drawRectangle({ x: 0, y: height - 100, width: width, height: 100, color: rgb(0.23, 0.51, 0.96) });
-    page.drawText('INVOICE', { x: width / 2 - 60, y: height - 60, size: 32, font: boldFont, color: rgb(1, 1, 1) });
-    
-    // Shop & Order Info
-    page.drawText('QuickCart Store', { x: 50, y: height - 140, size: 16, font: boldFont, color: rgb(0.12, 0.16, 0.24) });
-    page.drawText('Order ID: ' + String(order.id || 'N/A'), { x: 50, y: height - 165, size: 11, font: font, color: rgb(0.3, 0.35, 0.4) });
-    page.drawText('Date: ' + new Date(order.created_id || Date.now()).toLocaleDateString('en-IN'), { x: 50, y: height - 185, size: 11, font: font, color: rgb(0.3, 0.35, 0.4) });
-    
-    // Customer Info
-    page.drawText('Bill To:', { x: 50, y: height - 220, size: 13, font: boldFont, color: rgb(0.12, 0.16, 0.24) });
-    page.drawText('Phone: ' + String(order.phone || 'N/A'), { x: 50, y: height - 245, size: 11, font: font, color: rgb(0.3, 0.35, 0.4) });
-    page.drawText('Address: ' + String(order.address || 'N/A'), { x: 50, y: height - 265, size: 11, font: font, color: rgb(0.3, 0.35, 0.4) });
-    
-    // Table Header
-    const tableTop = height - 310;
-    page.drawRectangle({ x: 50, y: tableTop, width: 495, height: 30, color: rgb(0.23, 0.51, 0.96) });
-    page.drawText('#', { x: 60, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
-    page.drawText('Item', { x: 100, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
-    page.drawText('Price', { x: 320, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
-    page.drawText('GST%', { x: 400, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
-    page.drawText('Total', { x: 470, y: tableTop + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
-    
-    // Items ko properly parse karo - text[] array from PostgreSQL
-    let itemsArray = [];
-    
-    if (order.items) {
-      // text[] array hai - har element ek JSON string hai
-      const rawItems = Array.isArray(order.items) ? order.items : [order.items];
-      
-      itemsArray = rawItems.map(item => {
-        if (typeof item === 'string') {
-          // Try to parse as JSON
-          try {
-            const parsed = JSON.parse(item);            return {
-              name: String(parsed.name || 'Item'),
-              price: Number(parsed.price) || 500,
-              gst_rate: Number(parsed.gst_rate) || 18
-            };
-          } catch (e) {
-            // Not JSON, just a plain string (old format)
-            return { name: item, price: 500, gst_rate: 18 };
-          }
-        } else if (typeof item === 'object' && item !== null) {
-          return {
-            name: String(item.name || 'Item'),
-            price: Number(item.price) || 500,
-            gst_rate: Number(item.gst_rate) || 18
-          };
-        }
-        return { name: 'Item', price: 500, gst_rate: 18 };
-      });
+    const { orderId, chatId } = await request.json();
+
+    // 1. Order details fetch karo
+    const { data: order, error } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .single();
+
+    if (error || !order) {
+      return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
     }
+
+    // 2. PDF Generate karo (In-memory)
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    const chunks = [];
+    doc.on('data', chunk => chunks.push(chunk));
     
-    let y = tableTop - 30;
-    let subtotal = 0;
-    let gstTotal = 0;
-    
-    itemsArray.forEach((item, idx) => {
-      const price = item.price;
-      const gstRate = item.gst_rate;
-      const gst = price * gstRate / 100;
-      const itemTotal = price + gst;
-      subtotal += price;
-      gstTotal += gst;
-      
-      if (idx % 2 === 0) {
-        page.drawRectangle({ x: 50, y: y - 5, width: 495, height: 25, color: rgb(0.95, 0.96, 0.97) });
-      }
-      
-      page.drawText(String(idx + 1), { x: 60, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
-      page.drawText(item.name, { x: 100, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
-      page.drawText('Rs.' + price, { x: 320, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
-      page.drawText(gstRate + '%', { x: 400, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
-      page.drawText('Rs.' + itemTotal.toFixed(2), { x: 470, y: y, size: 10, font: font, color: rgb(0.12, 0.16, 0.24) });
-      
-      y -= 30;
+    const pdfPromise = new Promise((resolve) => {
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
     });
+
+    // --- PDF DESIGN ---
+    doc.fontSize(24).font('Helvetica-Bold').text('INVOICE', { align: 'center' });
+    doc.moveDown(0.5);
+    doc.fontSize(12).font('Helvetica').text(`Order ID: #${order.id.slice(0, 8).toUpperCase()}`, { align: 'center' });
+    doc.text(`Date: ${new Date(order.created_at).toLocaleDateString('en-IN')}`, { align: 'center' });
+    doc.moveDown(1);
     
-    // Totals Section
-    y -= 10;
-    page.drawLine({ start: { x: 50, y: y }, end: { x: 545, y: y }, thickness: 1, color: rgb(0.8, 0.8, 0.8) });
+    doc.fontSize(12).font('Helvetica-Bold').text('Bill To:');
+    doc.font('Helvetica').text(order.customer_name || 'Customer');
+    if (order.phone) doc.text(`Phone: ${order.phone}`);
+    if (order.address) doc.text(`Address: ${order.address}`);
+    doc.moveDown(1);
     
-    y -= 20;    page.drawText('Subtotal:', { x: 350, y: y, size: 11, font: font, color: rgb(0.3, 0.35, 0.4) });
-    page.drawText('Rs.' + subtotal, { x: 470, y: y, size: 11, font: font, color: rgb(0.3, 0.35, 0.4) });
+    doc.text('------------------------------------------------');
+    doc.moveDown(0.5);
+    doc.font('Helvetica-Bold').text('Order Details:');
+    doc.font('Helvetica').text(order.items || 'N/A');
+    doc.moveDown(1);
     
-    y -= 20;
-    page.drawText('GST Amount:', { x: 350, y: y, size: 11, font: font, color: rgb(0.3, 0.35, 0.4) });
-    page.drawText('Rs.' + gstTotal.toFixed(2), { x: 470, y: y, size: 11, font: font, color: rgb(0.3, 0.35, 0.4) });
+    // Calculation
+    const subtotal = Number(order.amount) || 0;
+    const gst = Math.round(subtotal * 0.18);
+    const total = subtotal + gst;
+
+    doc.text(`Subtotal: Rs. ${subtotal}`);
+    doc.text(`GST (18%): Rs. ${gst}`);
+    doc.moveDown(0.5);
+    doc.fontSize(14).font('Helvetica-Bold').text(`Total Amount: Rs. ${total}`, { align: 'right' });
+    doc.moveDown(2);
     
-    y -= 25;
-    page.drawText('Grand Total:', { x: 350, y: y, size: 14, font: boldFont, color: rgb(0.12, 0.16, 0.24) });
-    page.drawText('Rs.' + (subtotal + gstTotal).toFixed(2), { x: 470, y: y, size: 14, font: boldFont, color: rgb(0.06, 0.72, 0.51) });
+    doc.fontSize(10).font('Helvetica-Oblique').text('Thank you for shopping with us! 🙏', { align: 'center' });
+    doc.text('QuickCart - Digitizing Your Business', { align: 'center' });
     
-    // Footer
-    page.drawText('Thank you for shopping with us!', { x: width / 2 - 100, y: 60, size: 10, font: font, color: rgb(0.42, 0.45, 0.5) });
-    page.drawText('For any queries, contact us.', { x: width / 2 - 80, y: 40, size: 10, font: font, color: rgb(0.42, 0.45, 0.5) });
-    
-    const pdfBytes = await pdfDoc.save();
-    const pdfBase64 = Buffer.from(pdfBytes).toString('base64');
-    
-    return NextResponse.json({ success: true, pdf: pdfBase64, filename: 'invoice-' + order.id + '.pdf' });
+    doc.end(); // PDF generation complete karo
+
+    const pdfBuffer = await pdfPromise;
+
+    // 3. Telegram par PDF bhejo
+    if (BOT_TOKEN && chatId) {
+      const formData = new FormData();
+      const blob = new Blob([pdfBuffer], { type: 'application/pdf' });
+      
+      formData.append('chat_id', chatId);
+      formData.append('document', blob, `Invoice_${order.id.slice(0, 8).toUpperCase()}.pdf`);
+      formData.append('caption', `🧾 *Here is your invoice for Order #${order.id.slice(0, 8).toUpperCase()}*\n\nTotal Paid: Rs. ${total}\n\nThanks for shopping with us! 🙏`);
+      formData.append('parse_mode', 'Markdown');
+
+      const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
+        method: 'POST',
+        body: formData
+      });
+
+      const tgResult = await response.json();
+      console.log('📄 Telegram PDF sent:', tgResult.ok ? 'Success' : tgResult);
+    }
+
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('PDF Generation Error:', error);
+    console.error('❌ PDF Generation Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

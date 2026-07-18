@@ -37,7 +37,7 @@ export default function OrdersPage() {
   }
 
   async function updateOrderStatus(orderId: string, newStatus: string, time?: string) {
-    const { data: orderData } = await supabase.from('orders').select('customer_chat_id, tracking_code').eq('id', orderId).single();
+    const { data: orderData } = await supabase.from('orders').select('customer_chat_id, tracking_code, amount').eq('id', orderId).single();
     
     const updateData: any = { status: newStatus };
     if (time) updateData.delivery_time = time;
@@ -45,9 +45,27 @@ export default function OrdersPage() {
     const { error } = await supabase.from('orders').update(updateData).eq('id', orderId);
     
     if (!error) {
+      // Agar order Confirm hua hai, toh PDF Invoice bhejo
+      if (newStatus === 'Confirmed' && orderData?.customer_chat_id) {
+        try {
+          await fetch('/api/generate-invoice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              orderId: orderId, 
+              chatId: orderData.customer_chat_id 
+            })
+          });
+        } catch (err) {
+          console.error('PDF generation failed:', err);
+        }
+      }
+
+      // Customer ko text message bhi bhejo
       if (orderData?.customer_chat_id) {
         let message = '';
-        if (newStatus === 'Confirmed') {          message = `✅ *Order Confirmed!*\n\nEstimated delivery: ${time || 'Today'}\n\nTrack live: https://quickcart-dashboard-ten.vercel.app/track/${orderId}`;
+        if (newStatus === 'Confirmed') {
+          message = `✅ *Order Confirmed!*\n\nEstimated delivery: ${time || 'Today'}\n\nTrack live: https://quickcart-dashboard-ten.vercel.app/track/${orderId}`;
         } else if (newStatus === 'Out for Delivery') {
           message = `🚴 *Your order is out for delivery!*\n\nTrack live: https://quickcart-dashboard-ten.vercel.app/track/${orderId}`;
         } else if (newStatus === 'Delivered') {
@@ -68,20 +86,7 @@ export default function OrdersPage() {
       }
 
       fetchData(localStorage.getItem('userEmail') || '');
-      alert(`Order ${newStatus}! Customer notified.`);
-    }
-  }
-
-  function handleConfirmClick(orderId: string) {
-    setSelectedOrderId(orderId);
-    setShowDeliveryModal(true);
-  }
-
-  function submitDeliveryTime() {
-    if (selectedOrderId && deliveryTime) {
-      updateOrderStatus(selectedOrderId, 'Confirmed', deliveryTime);
-      setShowDeliveryModal(false);
-      setDeliveryTime('');
+      alert(`Order ${newStatus}! Customer notified with Invoice.`);
     }
   }
 
