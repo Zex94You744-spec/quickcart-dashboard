@@ -64,15 +64,24 @@ export async function POST(request) {
       cleanItems = cleanItems.replace(/(?:Mumbai|Kardha|Delhi|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/gi, '');
       cleanItems = cleanItems.replace(/,\s*\d{3,4}\s*,/g, ',');
       cleanItems = cleanItems.replace(/,\s*\d{3,4}$/, '');
-      
+
+      // Step 7: Cleanup - extra commas aur spaces hatao
       cleanItems = cleanItems
-        .replace(/,,+/g, ',')
-        .replace(/\s*,\s*/g, ', ')
-        .replace(/^,|,$/g, '')
-        .replace(/\s+/g, ' ')
+        .replace(/,,+/g, ',')           // Multiple commas → single comma
+        .replace(/\s*,\s*/g, ', ')      // Comma ke aas-paas standard spacing
+        .replace(/^,|,$/g, '')          // Shuru/end ke commas hatao
+        .replace(/\s+/g, ' ')           // Multiple spaces → single space
+        .replace(/,\s*$/, '')           // End ke trailing commas hatao
         .trim();
       
+      // Final check - agar end mein comma hai toh hata do
+      if (cleanItems.endsWith(',')) {
+        cleanItems = cleanItems.slice(0, -1).trim();
+      }
+      
+      // Agar items bohot chhota ho gaya (< 5 chars), toh original use karo
       const extractedItems = cleanItems.length > 5 ? cleanItems : messageText.replace(/Order:\s*/i, '').trim();
+
       console.log('📦 Extracted Items:', extractedItems);
 
       // --- 4. SAVE TO DATABASE ---
