@@ -15,17 +15,20 @@ export default function LoginPage() {
     setError('');
 
     try {
-      // --- ADMIN BYPASS ---
+      // --- ADMIN BYPASS WITH DELAY ---
       if (email.trim() === 'devbusines01@gmail.com' && password === 'TaYOpc9THewup94D6429qC3vxe+fZFKp') {
-        console.log('✅ Admin login successful');
+        console.log('✅ Admin credentials matched!');
         localStorage.setItem('userEmail', 'devbusines01@gmail.com');
         localStorage.setItem('userRole', 'admin');
         
-        // Proper Next.js client-side redirect
-        router.push('/admin/dashboard');
+        // 100ms ka delay taaki browser localStorage pakka save kar le
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // window.location.replace use karo, ye Next.js router.push se zyada reliable hai full page load ke liye
+        window.location.replace('/admin/dashboard');
         return;
       }
-      // ---------------------
+      // -------------------------------
 
       const { createClient } = await import('@supabase/supabase-js');
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -44,18 +47,20 @@ export default function LoginPage() {
         return;
       }
 
-      if (String(userData.password).trim() !== String(password).trim()) {
-        setError('Invalid email or password');
+      if (String(userData.password).trim() !== String(password).trim()) {        setError('Invalid email or password');
         setLoading(false);
-        return;      }
+        return;
+      }
 
       localStorage.setItem('userEmail', email.trim());
       localStorage.setItem('userRole', userData.role || 'user');
       
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       if (userData.role === 'admin') {
-        router.push('/admin/dashboard');
+        window.location.replace('/admin/dashboard');
       } else {
-        router.push('/dashboard');
+        window.location.replace('/dashboard');
       }
 
     } catch (err: any) {
@@ -92,11 +97,11 @@ export default function LoginPage() {
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition"
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Password *</label>
             <input
-              type="password"              value={password}
+              type="password"
+              value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="example@123"
               required
