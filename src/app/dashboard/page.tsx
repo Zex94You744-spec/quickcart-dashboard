@@ -24,30 +24,22 @@ export default function UserDashboard() {
 
   async function fetchUserData(email: string) {
     try {
-      // 1. User details fetch karo
       const { data: userData } = await supabase.from('leads').select('*').eq('email', email).single();
       if (userData) {
         setUser(userData);
-        
-        // 2. REAL ORDERS database se fetch karo (Latest 10)
         const { data: ordersData } = await supabase
           .from('orders')
           .select('*')
           .order('created_at', { ascending: false })
           .limit(10);
-          
-        if (ordersData && ordersData.length > 0) {
-          setOrders(ordersData);
-        } else {
-          // Agar abhi koi real order nahi hai, toh empty array rakho (UI mein "No orders" dikhega)
-          setOrders([]);
-        }
+        if (ordersData) setOrders(ordersData);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
-    }  }
+    }
+  }
 
   async function updateOrderStatus(orderId: string, newStatus: string) {
     const { error } = await supabase
@@ -55,9 +47,7 @@ export default function UserDashboard() {
       .update({ status: newStatus })
       .eq('id', orderId);
     
-    if (!error) {
-      // Status update hone ke baad data refresh karo
-      const { data: ordersData } = await supabase
+    if (!error) {      const { data: ordersData } = await supabase
         .from('orders')
         .select('*')
         .order('created_at', { ascending: false })
@@ -67,7 +57,11 @@ export default function UserDashboard() {
   }
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-600">Loading your business dashboard...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-600">
+        Loading your business dashboard...
+      </div>
+    );
   }
 
   if (!user) {
@@ -82,15 +76,14 @@ export default function UserDashboard() {
   }
 
   const isPaid = user.subscription_status === 'active';
-
-  // Real Stats Calculation
   const totalOrders = orders.length;
   const totalRevenue = orders.reduce((sum, order) => sum + (Number(order.amount) || 0), 0);
   const pendingOrders = orders.filter(o => o.status === 'Pending').length;
 
-  // Date format helper
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
+    return new Date(dateString).toLocaleDateString('en-IN', { 
+      year: 'numeric', month: 'short', day: 'numeric' 
+    });
   };
 
   return (
@@ -103,21 +96,25 @@ export default function UserDashboard() {
           <span className="font-semibold text-gray-800 text-lg">{user.shop_name}</span>
         </div>
         <div className="flex items-center gap-4">
-          <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${isPaid ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-orange-100 text-orange-700 border border-orange-200'}`}>
-            {isPaid ? '✅ Active Plan' : '⏳ Trial Mode'}
+          <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${isPaid ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-orange-100 text-orange-700 border border-orange-200'}`}>            {isPaid ? '✅ Active Plan' : '⏳ Trial Mode'}
           </span>
           <button 
-            onClick={() => { localStorage.removeItem('userEmail'); router.push('/login'); }} 
+            onClick={() => { 
+              localStorage.removeItem('userEmail'); 
+              router.push('/login'); 
+            }} 
             className="text-sm text-red-600 hover:text-red-800 font-medium px-3 py-1 rounded hover:bg-red-50 transition"
           >
             Logout
           </button>
         </div>
       </nav>
+
       <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Welcome back, {user.name}! 👋</h1>
-          <p className="text-gray-600 mt-1">Here is an overview of your store's performance today.</p>
+          <p className="text-gray-600 mt-1">Here is an overview of your store performance today.</p>
         </div>
 
         {/* Alert Banner */}
@@ -129,7 +126,10 @@ export default function UserDashboard() {
               </h3>
               <p className="text-orange-700 mt-1">Complete your payment to unlock unlimited orders, advanced analytics, and CSV exports.</p>
             </div>
-            <a href={`/checkout?lead_id=${user.id}`} className="bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-orange-700 transition shadow-md whitespace-nowrap flex items-center gap-2">
+            <a 
+              href={`/checkout?lead_id=${user.id}`} 
+              className="bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-orange-700 transition shadow-md whitespace-nowrap flex items-center gap-2"
+            >
               💳 Complete Payment Now
             </a>
           </div>
@@ -141,13 +141,15 @@ export default function UserDashboard() {
               </h3>
               <p className="text-green-700 mt-1">Your bot is ready to take orders. Make sure it is set up correctly.</p>
             </div>
-            <a href="/bot-setup" className="bg-green-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-green-700 transition shadow-md whitespace-nowrap flex items-center gap-2">
-              ⚙️ Bot Setup Guide
-            </a>
+            <a 
+              href="/bot-setup" 
+              className="bg-green-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-green-700 transition shadow-md whitespace-nowrap flex items-center gap-2"
+            >
+              ⚙️ Bot Setup Guide            </a>
           </div>
         )}
 
-        {/* Business Stats Cards (REAL DATA) */}
+        {/* Business Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition">
             <p className="text-sm text-gray-500 font-medium uppercase tracking-wide">Total Orders</p>
@@ -162,7 +164,8 @@ export default function UserDashboard() {
             <p className="text-3xl font-bold text-orange-600 mt-2">{pendingOrders}</p>
           </div>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition">
-            <p className="text-sm text-gray-500 font-medium uppercase tracking-wide">Bot Status</p>            <p className={`text-3xl font-bold mt-2 ${isPaid ? 'text-green-600' : 'text-gray-400'}`}>
+            <p className="text-sm text-gray-500 font-medium uppercase tracking-wide">Bot Status</p>
+            <p className={`text-3xl font-bold mt-2 ${isPaid ? 'text-green-600' : 'text-gray-400'}`}>
               {isPaid ? 'Connected' : 'Inactive'}
             </p>
           </div>
@@ -174,7 +177,7 @@ export default function UserDashboard() {
             <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition">📊</div>
             <div>
               <h3 className="font-bold text-gray-900">View Analytics</h3>
-              <p className="text-sm text-gray-500">Sales charts & insights</p>
+              <p className="text-sm text-gray-500">Sales charts and insights</p>
             </div>
           </a>
           <a href="/bot-setup" className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:border-blue-300 hover:shadow-md transition flex items-center gap-4 group">
@@ -192,8 +195,7 @@ export default function UserDashboard() {
             </div>
           </a>
         </div>
-
-        {/* Recent Orders Table (REAL DATA) */}
+        {/* Recent Orders Table */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
             <h2 className="text-lg font-bold text-gray-900">Recent Orders</h2>
@@ -211,7 +213,8 @@ export default function UserDashboard() {
                 <thead className="bg-gray-50 text-gray-500 text-xs uppercase font-semibold tracking-wider">
                   <tr>
                     <th className="px-6 py-4">Order ID</th>
-                    <th className="px-6 py-4">Customer</th>                    <th className="px-6 py-4">Items</th>
+                    <th className="px-6 py-4">Customer</th>
+                    <th className="px-6 py-4">Items</th>
                     <th className="px-6 py-4">Amount</th>
                     <th className="px-6 py-4">Status</th>
                     <th className="px-6 py-4">Date</th>
@@ -222,22 +225,31 @@ export default function UserDashboard() {
                   {orders.map((order) => (
                     <tr key={order.id} className="hover:bg-blue-50/30 transition">
                       <td className="px-6 py-4 font-mono font-medium text-blue-600">
-                        {order.id ? `#${order.id.slice(0, 8).toUpperCase()}` : 'N/A'}
+                        #{order.id ? order.id.slice(0, 8).toUpperCase() : 'N/A'}
                       </td>
-                      <td className="px-6 py-4 font-medium text-gray-900">{order.customer_name || 'Unknown'}</td>
-                      <td className="px-6 py-4 text-gray-600 max-w-xs truncate">{order.items}</td>
-                      <td className="px-6 py-4 font-semibold text-gray-900">₹{order.amount || 0}</td>
+                      <td className="px-6 py-4 font-medium text-gray-900">
+                        {order.customer_name || 'Unknown'}
+                      </td>
+                      <td className="px-6 py-4 text-gray-600 max-w-xs truncate">
+                        {order.items}
+                      </td>
+                      <td className="px-6 py-4 font-semibold text-gray-900">
+                        ₹{order.amount || 0}
+                      </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
                           order.status === 'Completed' ? 'bg-green-100 text-green-700' : 
-                          order.status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                          order.status === 'Rejected' ? 'bg-red-100 text-red-700' : 
+                          'bg-yellow-100 text-yellow-700'
                         }`}>
-                          {order.status === 'Completed' ? '✓ ' : order.status === 'Rejected' ? '✗ ' : '⏳ '}{order.status}
-                        </span>
+                          {order.status === 'Completed' ? '✓ ' : order.status === 'Rejected' ? '✗ ' : '⏳ '}
+                          {order.status}                        </span>
                       </td>
-                      <td className="px-6 py-4 text-gray-500">{formatDate(order.created_at)}</td>
+                      <td className="px-6 py-4 text-gray-500">
+                        {formatDate(order.created_at)}
+                      </td>
                       <td className="px-6 py-4">
-                        {order.status === 'Pending' && (
+                        {order.status === 'Pending' ? (
                           <div className="flex gap-2">
                             <button 
                               onClick={() => updateOrderStatus(order.id, 'Completed')}
@@ -252,19 +264,23 @@ export default function UserDashboard() {
                               ❌ Reject
                             </button>
                           </div>
-                        )}
-                        {order.status !== 'Pending' && (
+                        ) : (
                           <span className="text-xs text-gray-400 font-medium">Processed</span>
                         )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
+              </table>
+            </div>
+          )}
           
           <div className="px-6 py-4 bg-blue-50/50 border-t border-blue-100">
             <p className="text-sm text-blue-700 flex items-start gap-2">
               <span className="text-lg">ℹ️</span> 
-              <span><strong>Live Data:</strong> Orders received via your Telegram bot will appear here automatically in real-time.</span>
+              <span>
+                <strong>Live Data:</strong> Orders received via your Telegram bot will appear here automatically in real-time.
+              </span>
             </p>
           </div>
         </div>
