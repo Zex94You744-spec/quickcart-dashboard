@@ -56,21 +56,29 @@ export async function POST(request) {
     // Text ko wrap karo taaki page se bahar na jaye
     const splitItems = doc.splitTextToSize(order.items || "N/A", 170);
     doc.text(splitItems, 20, 120);
-    
-    // Calculation
+
+    // Calculation - Better positioning
     const subtotal = Number(order.amount) || 0;
     const gst = Math.round(subtotal * 0.18);
     const total = subtotal + gst;
     
     const yPos = 120 + (splitItems.length * 7) + 15;
     
-    doc.text(`Subtotal: Rs. ${subtotal}`, 190, yPos, null, null, "right");
-    doc.text(`GST (18%): Rs. ${gst}`, 190, yPos + 8, null, null, "right");
+    // Amounts ko thoda left shift karo taaki cut na ho
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+    doc.text(`Subtotal: Rs. ${subtotal}`, 150, yPos, null, null, "right");
+    doc.text(`GST (18%): Rs. ${gst}`, 150, yPos + 8, null, null, "right");
     
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
-    doc.text(`Total Amount: Rs. ${total}`, 190, yPos + 20, null, null, "right");
+    doc.text(`Total Amount: Rs. ${total}`, 150, yPos + 20, null, null, "right");
     
+    // Optional: Ek box banao amounts ke liye
+    doc.setLineWidth(0.5);
+    doc.setDrawColor(200);
+    doc.rect(145, yPos - 5, 50, 35);
+
     // Footer
     doc.setFontSize(10);
     doc.setFont("helvetica", "italic");
