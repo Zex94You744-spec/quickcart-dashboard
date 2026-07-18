@@ -18,25 +18,64 @@ export async function POST(request) {
       const messageText = body.message.text;
       const firstName = body.message.from.first_name || 'Unknown';
 
-      // Smart Extraction: Items, Address, Phone, Amount
-      const amountMatch = messageText.match(/(?:total|Total|₹)\s*:?\s*(\d+)/i);
-      const extractedAmount = amountMatch ? parseInt(amountMatch[1], 10) : 0;
+      console.log('📩 New Message:', messageText);
 
+      // --- 1. SMART AMOUNT EXTRACTION ---
+      let extractedAmount = 0;
+      
+      // Try 1: "total: 650" ya "Total: 650"
+      const totalMatch = messageText.match(/(?:total|Total)\s*:?\s*(\d+)/i);
+      if (totalMatch) {
+        extractedAmount = parseInt(totalMatch[1], 10);
+      }
+      
+      // Try 2: "₹650" ya "Rs. 650" ya "Rs 650"
+      if (extractedAmount === 0) {
+        const rupeeMatch = messageText.match(/(?:₹|Rs\.?|INR)\s*(\d+)/i);
+        if (rupeeMatch) {
+          extractedAmount = parseInt(rupeeMatch[1], 10);
+        }
+      }
+      
+      // Try 3: Fallback (Last valid number, phone number ko ignore karke)
+      if (extractedAmount === 0) {
+        const numbers = messageText.match(/\d+/g);
+        if (numbers && numbers.length > 0) {
+          for (let i = numbers.length - 1; i >= 0; i--) {
+            const num = parseInt(numbers[i], 10);
+            // Phone number 10 digit ka hota hai (1 billion se bada), isliye usko skip karo
+            if (num < 1000000000 && num > 0) {
+              extractedAmount = num;
+              break;
+            }          }
+        }
+      }
+
+      console.log('💰 Extracted Amount:', extractedAmount);
+
+      // --- 2. PHONE & ADDRESS EXTRACTION ---
       const phoneMatch = messageText.match(/(\d{10})/);
       const extractedPhone = phoneMatch ? phoneMatch[1] : '';
 
-      // Address extract karo (Mumbai, Kardha, etc.)
-      const addressMatch = messageText.match(/(?:Mumbai|Kardha|Delhi|Bangalore|Chennai|Kolkata)/i);
+      // Common cities add kar sakte ho
+      const addressMatch = messageText.match(/(?:Mumbai|Kardha|Delhi|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/i);
       const extractedAddress = addressMatch ? addressMatch[0] : 'Not provided';
 
-      // Items extract karo (Order: ke baad ka text)
-      const itemsMatch = messageText.match(/Order:\s*(.+?)(?:,|$)/i);
-      const extractedItems = itemsMatch ? itemsMatch[1].trim() : messageText;
+      // --- 3. ITEMS EXTRACTION (Clean up the text) ---
+      // Amount, phone, aur address ko text se hata do taaki sirf items bachein
+      let cleanItems = messageText
+        .replace(/\d{10}/g, '') // Phone number hatao
+        .replace(/(?:Mumbai|Kardha|Delhi|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/gi, '') // Address hatao
+        .replace(/(?:total|Total|₹|Rs\.?|INR)\s*:?\s*\d+/gi, '') // Amount hatao
+        .replace(/Order:\s*/i, '') // "Order:" word hatao
+        .replace(/^,|,$/g, '') // Shuru aur end ke commas hatao
+        .trim();
+        
+      const extractedItems = cleanItems || messageText;
 
-      // Unique tracking code generate karo
+      // --- 4. SAVE TO DATABASE ---
       const trackingCode = 'TRACK' + Date.now().toString().slice(-6);
 
-      // Order save karo
       const { data, error } = await supabase
         .from('orders')
         .insert([
@@ -57,14 +96,13 @@ export async function POST(request) {
         console.error('❌ Database error:', error);
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });
       }
-
       console.log('✅ Order saved:', data);
 
-      // Customer ko reply bhejo with tracking link
+      // --- 5. SEND REPLY TO CUSTOMER ---
       if (BOT_TOKEN && data && data[0]) {
         const trackingLink = `https://quickcart-dashboard-ten.vercel.app/track/${data[0].id}`;
         
-        const replyMessage = `✅ *Order Received!*\n\n📦 *Items:*\n• ${extractedItems}\n\n💰 *Total: ₹${extractedAmount}*\n📍 *Address: ${extractedAddress}*\n📞 *Phone: ${extractedPhone}*\n\n🔗 *Track your order:*\n${trackingLink}\n\n💾 Order saved! Shop will contact you soon.`;
+        const replyMessage = `✅ *Order Received!*\n\n *Items:*\n• ${extractedItems}\n\n💰 *Total: ₹${extractedAmount}*\n📍 *Address: ${extractedAddress}*\n📞 *Phone: ${extractedPhone}*\n\n🔗 *Track your order:*\n${trackingLink}\n\n Order saved! Shop will contact you soon.`;
 
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           method: 'POST',
