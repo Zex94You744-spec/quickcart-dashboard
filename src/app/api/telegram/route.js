@@ -12,32 +12,42 @@ export async function POST(request) {
   
   try {
     const body = await request.json();
-    console.log('📦 Full webhook payload:', JSON.stringify(body, null, 2));
     
     if (body.message && body.message.text) {
-      const chatId = body.message.chat.id; // 👈 Customer ka Telegram ID
+      const chatId = body.message.chat.id;
       const messageText = body.message.text;
       const firstName = body.message.from.first_name || 'Unknown';
-      const userId = body.message.from.id;
 
-      console.log('📩 New Telegram Message:', messageText);
-      console.log('👤 From user:', firstName, '(Chat ID:', chatId, ')');
-
-      // Smart Amount Extraction: "total: 650" ya "₹650" ko dhund kar number nikalega
+      // Smart Extraction: Items, Address, Phone, Amount
       const amountMatch = messageText.match(/(?:total|Total|₹)\s*:?\s*(\d+)/i);
       const extractedAmount = amountMatch ? parseInt(amountMatch[1], 10) : 0;
 
-      console.log('💰 Extracted Amount:', extractedAmount);
+      const phoneMatch = messageText.match(/(\d{10})/);
+      const extractedPhone = phoneMatch ? phoneMatch[1] : '';
 
-      // Order ko database mein save karo (AB CHAT ID BHI SAVE HOGA)
+      // Address extract karo (Mumbai, Kardha, etc.)
+      const addressMatch = messageText.match(/(?:Mumbai|Kardha|Delhi|Bangalore|Chennai|Kolkata)/i);
+      const extractedAddress = addressMatch ? addressMatch[0] : 'Not provided';
+
+      // Items extract karo (Order: ke baad ka text)
+      const itemsMatch = messageText.match(/Order:\s*(.+?)(?:,|$)/i);
+      const extractedItems = itemsMatch ? itemsMatch[1].trim() : messageText;
+
+      // Unique tracking code generate karo
+      const trackingCode = 'TRACK' + Date.now().toString().slice(-6);
+
+      // Order save karo
       const { data, error } = await supabase
         .from('orders')
         .insert([
           {
             customer_name: firstName,
-            customer_chat_id: chatId, // 👈 Ye naya column hai
-            items: messageText,
-            amount: extractedAmount, // 👈 Ab sahi amount save hoga!
+            customer_chat_id: chatId,
+            items: extractedItems,
+            amount: extractedAmount,
+            address: extractedAddress,
+            phone: extractedPhone,
+            tracking_code: trackingCode,
             status: 'Pending'
           }
         ])
@@ -48,30 +58,29 @@ export async function POST(request) {
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });
       }
 
-      console.log('✅ Order saved to database:', data);
-      
-      // User ko reply bhejo
-      if (BOT_TOKEN) {
-        const replyResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      console.log('✅ Order saved:', data);
+
+      // Customer ko reply bhejo with tracking link
+      if (BOT_TOKEN && data && data[0]) {
+        const trackingLink = `https://quickcart-dashboard-ten.vercel.app/track/${data[0].id}`;
+        
+        const replyMessage = `✅ *Order Received!*\n\n📦 *Items:*\n• ${extractedItems}\n\n💰 *Total: ₹${extractedAmount}*\n📍 *Address: ${extractedAddress}*\n📞 *Phone: ${extractedPhone}*\n\n🔗 *Track your order:*\n${trackingLink}\n\n💾 Order saved! Shop will contact you soon.`;
+
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             chat_id: chatId,
-            text: `✅ Dhanyawad ${firstName}!\n\nAapka order receive ho gaya hai:\n"${messageText}"\n\nHum jald hi confirm karenge.`
+            text: replyMessage,
+            parse_mode: 'Markdown'
           })
         });
-
-        const replyData = await replyResponse.json();
-        console.log('📤 Telegram reply sent:', replyData);
-      } else {
-        console.error('❌ BOT_TOKEN missing in environment variables!');
       }
 
       return NextResponse.json({ success: true });
-    } else {
-      console.log('⚠️ No valid message in webhook payload');
-      return NextResponse.json({ success: true, message: 'No message to process' });
     }
+
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('❌ Telegram Webhook Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
