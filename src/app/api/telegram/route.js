@@ -18,23 +18,26 @@ export async function POST(request) {
       const messageText = body.message.text;
       const firstName = body.message.from.first_name || 'Unknown';
 
-      console.log(' New Message:', messageText);
+      console.log('📩 New Message:', messageText);
 
       // --- 1. SMART AMOUNT EXTRACTION ---
       let extractedAmount = 0;
       
+      // Try 1: "total: 350" ya "Total: 350"
       const totalMatch = messageText.match(/(?:total|Total)\s*:?\s*(\d+)/i);
       if (totalMatch) {
         extractedAmount = parseInt(totalMatch[1], 10);
       }
       
+      // Try 2: "₹350" ya "Rs. 350" ya "Rs 350"
       if (extractedAmount === 0) {
-        const rupeeMatch = messageText.match(/(?:|Rs\.?|INR)\s*(\d+)/i);
+        const rupeeMatch = messageText.match(/(?:₹|Rs\.?|INR)\s*(\d+)/i);
         if (rupeeMatch) {
           extractedAmount = parseInt(rupeeMatch[1], 10);
         }
       }
       
+      // Try 3: Fallback (Last valid number, phone number ko ignore karke)
       if (extractedAmount === 0) {
         const numbers = messageText.match(/\d+/g);
         if (numbers && numbers.length > 0) {
@@ -44,9 +47,9 @@ export async function POST(request) {
               extractedAmount = num;
               break;
             }
-          }
-        }
+          }        }
       }
+
       console.log('💰 Extracted Amount:', extractedAmount);
 
       // --- 2. PHONE & ADDRESS EXTRACTION ---
@@ -56,7 +59,7 @@ export async function POST(request) {
       const addressMatch = messageText.match(/(?:Mumbai|Kardha|Delhi|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/i);
       const extractedAddress = addressMatch ? addressMatch[0] : 'Not provided';
 
-      // --- 3. ITEMS EXTRACTION (Ultimate Clean) ---
+      // --- 3. ITEMS EXTRACTION (Ultimate Split & Filter) ---
       let cleanItems = messageText;
       
       // Step 1: "Order:" word hatao
@@ -65,44 +68,35 @@ export async function POST(request) {
       // Step 2: Phone number hatao (exactly 10 digits)
       cleanItems = cleanItems.replace(/\s*\d{10}\s*/g, '');
       
-      // Step 3: "total: 250" ya "Total: 250" pattern hatao
+      // Step 3: Amount patterns hatao
       cleanItems = cleanItems.replace(/(?:total|Total)\s*:?\s*\d+/gi, '');
-      
-      // Step 4: "250" ya "Rs. 250" ya "Rs 250" pattern hatao  
       cleanItems = cleanItems.replace(/(?:₹|Rs\.?|INR)\s*\d+/gi, '');
       
-      // Step 5: Cities hatao
+      // Step 4: Cities hatao
       cleanItems = cleanItems.replace(/(?:Mumbai|Kardha|Delhi|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/gi, '');
       
-      // Step 6: Standalone 3-4 digit numbers hatao (jo amounts hain)
+      // Step 5: Standalone 3-4 digit numbers hatao (jo amounts hain)
       cleanItems = cleanItems.replace(/,\s*\d{3,4}\s*,/g, ',');
       cleanItems = cleanItems.replace(/,\s*\d{3,4}$/, '');
       
-      // Step 7: AGGRESSIVE CLEANUP
-      cleanItems = cleanItems
-        .replace(/,,+/g, ',')           // Multiple commas → single comma
-        .replace(/\s*,\s*/g, ', ')      // Comma spacing standardize
-        .replace(/^,|,$/g, '')          // Remove start/end commas
-        .replace(/\s+/g, ' ')           // Multiple spaces → single space
-        .trim();
-
-      // Step 8: FINAL CLEANUP - Remove trailing comma
-      if (cleanItems.endsWith(',')) {
-        cleanItems = cleanItems.slice(0, -1).trim();
-      }
-      cleanItems = cleanItems.replace(/,\s*$/, '').trim();
+      // Step 6: SPLIT BY COMMA, FILTER, AND JOIN (The Ultimate Fix)
+      const itemsArray = cleanItems
+        .split(',')                    // Comma se split karo
+        .map(item => item.trim())      // Har item ko trim karo
+        .filter(item => {
+          // Empty strings, pure numbers, aur bohot chhote items ko hatao
+          return item.length > 2 && !/^\d+$/.test(item);
+        });
       
-      const extractedItems = cleanItems.length > 5 ? cleanItems : messageText.replace(/Order:\s*/i, '').trim();
-
-      // Remove any remaining trailing commas
-      cleanItems = cleanItems.replace(/,\s*$/, '').trim();
+      // Join with comma (ab koi trailing comma nahi aayega)
+      const extractedItems = itemsArray.join(', ');
       
-      // Agar items empty/bohot chhota hai, toh original use karo
-      const extractedItems = cleanItems.length > 5 ? cleanItems : messageText.replace(/Order:\s*/i, '').trim();
-      console.log('📦 Extracted Items:', extractedItems);
+      // Agar items empty hai, toh original use karo
+      const finalItems = extractedItems.length > 3 ? extractedItems : messageText.replace(/Order:\s*/i, '').trim();
 
-      // --- 4. SAVE TO DATABASE ---
-      const newTrackingCode = 'TRACK' + Date.now().toString().slice(-6);
+      console.log('📦 Extracted Items:', finalItems);
+
+      // --- 4. SAVE TO DATABASE ---      const newTrackingCode = 'TRACK' + Date.now().toString().slice(-6);
 
       const { data, error } = await supabase
         .from('orders')
@@ -110,7 +104,7 @@ export async function POST(request) {
           {
             customer_name: firstName,
             customer_chat_id: chatId,
-            items: extractedItems,
+            items: finalItems,
             amount: extractedAmount,
             address: extractedAddress,
             phone: extractedPhone,
@@ -128,14 +122,13 @@ export async function POST(request) {
       console.log('✅ Order saved:', data);
 
       // --- 5. SEND REPLY TO CUSTOMER ---
-      // --- 5. SEND REPLY TO CUSTOMER ---
       if (BOT_TOKEN && data && data[0]) {
         const trackingLink = `https://quickcart-dashboard-ten.vercel.app/track/${data[0].id}`;
         
-        // Clean items for reply (remove trailing comma)
-        const cleanItemsForReply = extractedItems.replace(/,\s*$/, '').trim();
-        
-        const replyMessage = `✅ *Order Received!*\n\n *Items:*\n• ${cleanItemsForReply}\n\n💰 *Total: ₹${extractedAmount}*\n📍 *Address: ${extractedAddress}*\n *Phone: ${extractedPhone}*\n\n🔗 *Track your order:*\n${trackingLink}\n\n💾 Order saved! Shop will contact you soon.`;
+        // Final safety check for reply message (remove trailing comma if any)
+        const cleanReplyItems = finalItems.replace(/,\s*$/, '').trim();
+
+        const replyMessage = `✅ *Order Received!*\n\n📦 *Items:*\n• ${cleanReplyItems}\n\n💰 *Total: ₹${extractedAmount}*\n📍 *Address: ${extractedAddress}*\n📞 *Phone: ${extractedPhone}*\n\n🔗 *Track your order:*\n${trackingLink}\n\n💾 Order saved! Shop will contact you soon.`;
 
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           method: 'POST',
