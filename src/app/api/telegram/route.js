@@ -62,16 +62,35 @@ export async function POST(request) {
       const extractedAddress = addressMatch ? addressMatch[0] : 'Not provided';
 
       // --- 3. ITEMS EXTRACTION (Clean up the text) ---
-      // Amount, phone, aur address ko text se hata do taaki sirf items bachein
-      let cleanItems = messageText
-        .replace(/\d{10}/g, '') // Phone number hatao
-        .replace(/(?:Mumbai|Kardha|Delhi|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/gi, '') // Address hatao
-        .replace(/(?:total|Total|₹|Rs\.?|INR)\s*:?\s*\d+/gi, '') // Amount hatao
-        .replace(/Order:\s*/i, '') // "Order:" word hatao
-        .replace(/^,|,$/g, '') // Shuru aur end ke commas hatao
+      let cleanItems = messageText;
+      
+      // Step 1: "Order:" word hatao
+      cleanItems = cleanItems.replace(/Order:\s*/i, '');
+      
+      // Step 2: Phone number hatao (10 digit)
+      cleanItems = cleanItems.replace(/\d{10}/g, '');
+      
+      // Step 3: Amount/Price patterns hatao
+      cleanItems = cleanItems.replace(/(?:total|Total)\s*:?\s*\d+/gi, '');
+      cleanItems = cleanItems.replace(/(?:|Rs\.?|INR)\s*\d+/gi, '');
+      
+      // Step 4: Standalone numbers hatao (jo amount ho sakte hain)
+      // Par sirf wo numbers jo 3-4 digits ke hain (100-9999 range)
+      cleanItems = cleanItems.replace(/\b\d{3,4}\b/g, '');
+      
+      // Step 5: Common cities hatao
+      cleanItems = cleanItems.replace(/(?:Mumbai|Kardha|Delhi|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/gi, '');
+      
+      // Step 6: Cleanup - extra commas, spaces, aur special characters hatao
+      cleanItems = cleanItems
+        .replace(/,,+/g, ',')  // Multiple commas ko single comma mein badal
+        .replace(/\s*,\s*/g, ', ')  // Comma ke aas-paas spaces ko standardize kar
+        .replace(/^,|,$/g, '')  // Shuru aur end ke commas hatao
+        .replace(/\s+/g, ' ')  // Multiple spaces ko single space mein badal
         .trim();
-        
-      const extractedItems = cleanItems || messageText;
+      
+      // Agar items empty ho gaye, toh original message use karo (minus Order: word)
+      const extractedItems = cleanItems.length > 2 ? cleanItems : messageText.replace(/Order:\s*/i, '').trim();
 
       // --- 4. SAVE TO DATABASE ---
       const trackingCode = 'TRACK' + Date.now().toString().slice(-6);
