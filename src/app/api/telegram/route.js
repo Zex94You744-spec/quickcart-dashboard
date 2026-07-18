@@ -18,7 +18,7 @@ export async function POST(request) {
       const messageText = body.message.text;
       const firstName = body.message.from.first_name || 'Unknown';
 
-      console.log('📩 New Message:', messageText);
+      console.log(' New Message:', messageText);
 
       // --- 1. SMART AMOUNT EXTRACTION ---
       let extractedAmount = 0;
@@ -57,43 +57,46 @@ export async function POST(request) {
       const phoneMatch = messageText.match(/(\d{10})/);
       const extractedPhone = phoneMatch ? phoneMatch[1] : '';
 
-      // Common cities add kar sakte ho
       const addressMatch = messageText.match(/(?:Mumbai|Kardha|Delhi|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/i);
       const extractedAddress = addressMatch ? addressMatch[0] : 'Not provided';
 
-      // --- 3. ITEMS EXTRACTION (Clean up the text) ---
+      // --- 3. ITEMS EXTRACTION (Better Logic) ---
       let cleanItems = messageText;
       
       // Step 1: "Order:" word hatao
       cleanItems = cleanItems.replace(/Order:\s*/i, '');
       
-      // Step 2: Phone number hatao (10 digit)
-      cleanItems = cleanItems.replace(/\d{10}/g, '');
+      // Step 2: Phone number hatao (exactly 10 digits)
+      cleanItems = cleanItems.replace(/\s*\d{10}\s*/g, '');
       
-      // Step 3: Amount/Price patterns hatao
+      // Step 3: "total: 250" ya "Total: 250" pattern hatao
       cleanItems = cleanItems.replace(/(?:total|Total)\s*:?\s*\d+/gi, '');
-      cleanItems = cleanItems.replace(/(?:|Rs\.?|INR)\s*\d+/gi, '');
       
-      // Step 4: Standalone numbers hatao (jo amount ho sakte hain)
-      // Par sirf wo numbers jo 3-4 digits ke hain (100-9999 range)
-      cleanItems = cleanItems.replace(/\b\d{3,4}\b/g, '');
+      // Step 4: "250" ya "Rs. 250" ya "Rs 250" pattern hatao  
+      cleanItems = cleanItems.replace(/(?:₹|Rs\.?|INR)\s*\d+/gi, '');
       
-      // Step 5: Common cities hatao
+      // Step 5: Cities hatao
       cleanItems = cleanItems.replace(/(?:Mumbai|Kardha|Delhi|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/gi, '');
       
-      // Step 6: Cleanup - extra commas, spaces, aur special characters hatao
+      // Step 6: Standalone 3-4 digit numbers hatao (jo amounts hain)
+      // Lekin quantity ke numbers ko mat hatao (jaise "1kg" ya "2kg")
+      cleanItems = cleanItems.replace(/,\s*\d{3,4}\s*,/g, ',');
+      cleanItems = cleanItems.replace(/,\s*\d{3,4}$/, '');
+      
+      // Step 7: Cleanup - extra commas aur spaces hatao
       cleanItems = cleanItems
-        .replace(/,,+/g, ',')  // Multiple commas ko single comma mein badal
-        .replace(/\s*,\s*/g, ', ')  // Comma ke aas-paas spaces ko standardize kar
-        .replace(/^,|,$/g, '')  // Shuru aur end ke commas hatao
-        .replace(/\s+/g, ' ')  // Multiple spaces ko single space mein badal
+        .replace(/,,+/g, ',')           // Multiple commas → single comma
+        .replace(/\s*,\s*/g, ', ')      // Comma ke aas-paas standard spacing
+        .replace(/^,|,$/g, '')          // Shuru/end ke commas hatao
+        .replace(/\s+/g, ' ')           // Multiple spaces → single space
         .trim();
       
-      // Agar items empty ho gaye, toh original message use karo (minus Order: word)
-      const extractedItems = cleanItems.length > 2 ? cleanItems : messageText.replace(/Order:\s*/i, '').trim();
+      // Agar items bohot chhota ho gaya (< 5 chars), toh original use karo
+      const extractedItems = cleanItems.length > 5 ? cleanItems : messageText.replace(/Order:\s*/i, '').trim();
 
-      // --- 4. SAVE TO DATABASE ---
-      const trackingCode = 'TRACK' + Date.now().toString().slice(-6);
+      console.log(' Extracted Items:', extractedItems);
+
+      // --- 4. SAVE TO DATABASE ---      const trackingCode = 'TRACK' + Date.now().toString().slice(-6);
 
       const { data, error } = await supabase
         .from('orders')
@@ -115,13 +118,14 @@ export async function POST(request) {
         console.error('❌ Database error:', error);
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });
       }
+
       console.log('✅ Order saved:', data);
 
       // --- 5. SEND REPLY TO CUSTOMER ---
       if (BOT_TOKEN && data && data[0]) {
         const trackingLink = `https://quickcart-dashboard-ten.vercel.app/track/${data[0].id}`;
         
-        const replyMessage = `✅ *Order Received!*\n\n *Items:*\n• ${extractedItems}\n\n💰 *Total: ₹${extractedAmount}*\n📍 *Address: ${extractedAddress}*\n📞 *Phone: ${extractedPhone}*\n\n🔗 *Track your order:*\n${trackingLink}\n\n Order saved! Shop will contact you soon.`;
+        const replyMessage = `✅ *Order Received!*\n\n *Items:*\n• ${extractedItems}\n\n *Total: ₹${extractedAmount}*\n📍 *Address: ${extractedAddress}*\n📞 *Phone: ${extractedPhone}*\n\n🔗 *Track your order:*\n${trackingLink}\n\n Order saved! Shop will contact you soon.`;
 
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           method: 'POST',
@@ -141,5 +145,4 @@ export async function POST(request) {
   } catch (error) {
     console.error('❌ Telegram Webhook Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  }
-}
+  }}
