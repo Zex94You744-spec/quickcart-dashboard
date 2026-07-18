@@ -88,7 +88,7 @@ export default function AnalyticsPage() {
   const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
 
   // Revenue by Date (Last X days)
-  const revenueByDate = {};
+  const revenueByDate: { [key: string]: number } = {};
   orders.forEach(order => {
     const date = new Date(order.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
     revenueByDate[date] = (revenueByDate[date] || 0) + (Number(order.amount) || 0);
@@ -134,7 +134,7 @@ export default function AnalyticsPage() {
   };
 
   // Top Customers
-  const customerRevenue = {};
+  const customerRevenue: { [key: string]: number } = {};
   orders.forEach(order => {
     const customer = order.customer_name || 'Unknown';
     customerRevenue[customer] = (customerRevenue[customer] || 0) + (Number(order.amount) || 0);
