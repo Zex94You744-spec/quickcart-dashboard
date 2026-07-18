@@ -12,6 +12,8 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  
+  // Modal states
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [deliveryTime, setDeliveryTime] = useState('');
@@ -30,22 +32,25 @@ export default function OrdersPage() {
       const { data: ordersData } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
       if (ordersData) setOrders(ordersData);
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
     }
   }
 
   async function updateOrderStatus(orderId: string, newStatus: string, time?: string) {
-    const { data: orderData } = await supabase.from('orders').select('customer_chat_id, tracking_code, amount').eq('id', orderId).single();
+    const { data: orderData } = await supabase
+      .from('orders')
+      .select('customer_chat_id, tracking_code, amount')
+      .eq('id', orderId)
+      .single();
     
     const updateData: any = { status: newStatus };
     if (time) updateData.delivery_time = time;
-
     const { error } = await supabase.from('orders').update(updateData).eq('id', orderId);
     
     if (!error) {
-      // Agar order Confirm hua hai, toh PDF Invoice bhejo
+      // 1. Agar order Confirm hua hai, toh PDF Invoice generate karke bhejo
       if (newStatus === 'Confirmed' && orderData?.customer_chat_id) {
         try {
           await fetch('/api/generate-invoice', {
@@ -61,7 +66,7 @@ export default function OrdersPage() {
         }
       }
 
-      // Customer ko text message bhi bhejo
+      // 2. Customer ko text message bhi bhejo
       if (orderData?.customer_chat_id) {
         let message = '';
         if (newStatus === 'Confirmed') {
@@ -86,7 +91,21 @@ export default function OrdersPage() {
       }
 
       fetchData(localStorage.getItem('userEmail') || '');
-      alert(`Order ${newStatus}! Customer notified with Invoice.`);
+      alert(`Order ${newStatus}! Customer notified.`);
+    }
+  }
+
+  // 👇 YE FUNCTION MODAL OPEN KARTA HAI
+  function handleConfirmClick(orderId: string) {    setSelectedOrderId(orderId);
+    setShowDeliveryModal(true);
+  }
+
+  // 👇 YE FUNCTION MODAL SE DELIVERY TIME LEKAR ORDER CONFIRM KARTA HAI
+  function submitDeliveryTime() {
+    if (selectedOrderId && deliveryTime) {
+      updateOrderStatus(selectedOrderId, 'Confirmed', deliveryTime);
+      setShowDeliveryModal(false);
+      setDeliveryTime('');
     }
   }
 
@@ -101,7 +120,8 @@ export default function OrdersPage() {
           ← Back to Dashboard
         </button>
         <span className="text-gray-300">|</span>
-        <span className="font-bold text-gray-900 text-lg">{user?.shop_name || 'My Store'} - All Orders</span>      </nav>
+        <span className="font-bold text-gray-900 text-lg">{user?.shop_name || 'My Store'} - All Orders</span>
+      </nav>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -125,8 +145,7 @@ export default function OrdersPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="bg-gray-50 text-gray-500 text-xs uppercase font-semibold tracking-wider">
-                  <tr>
+                <thead className="bg-gray-50 text-gray-500 text-xs uppercase font-semibold tracking-wider">                  <tr>
                     <th className="px-8 py-4">Order ID</th>
                     <th className="px-8 py-4">Customer</th>
                     <th className="px-8 py-4">Items</th>
@@ -150,7 +169,8 @@ export default function OrdersPage() {
                           order.status === 'Confirmed' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' :
                           order.status === 'Rejected' ? 'bg-red-50 text-red-700 border border-red-200' : 
                           'bg-yellow-50 text-yellow-700 border border-yellow-200'
-                        }`}>                          {order.status === 'Delivered' ? '✓ ' : order.status === 'Rejected' ? '✗ ' : '⏳ '}{order.status}
+                        }`}>
+                          {order.status === 'Delivered' ? '✓ ' : order.status === 'Rejected' ? '✗ ' : '⏳ '}{order.status}
                         </span>
                       </td>
                       <td className="px-8 py-5 text-gray-500 whitespace-nowrap">{formatDate(order.created_at)}</td>
@@ -174,8 +194,7 @@ export default function OrdersPage() {
                           <button onClick={() => updateOrderStatus(order.id, 'Delivered')} className="text-xs bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition font-semibold shadow-sm">
                             ✓ Mark Delivered
                           </button>
-                        )}
-                        {(order.status === 'Delivered' || order.status === 'Rejected') && (
+                        )}                        {(order.status === 'Delivered' || order.status === 'Rejected') && (
                           <span className="text-xs text-gray-400 font-medium italic">Processed</span>
                         )}
                       </td>
@@ -191,7 +210,7 @@ export default function OrdersPage() {
       {/* Delivery Time Modal */}
       {showDeliveryModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
             <h3 className="text-xl font-bold text-gray-900 mb-4">Set Delivery Time</h3>
             <p className="text-sm text-gray-600 mb-4">When will this order be delivered?</p>
             <input 
@@ -199,12 +218,14 @@ export default function OrdersPage() {
               value={deliveryTime}
               onChange={(e) => setDeliveryTime(e.target.value)}
               placeholder="e.g., Today by 5 PM"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none mb-4"            />
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none mb-4"
+              autoFocus
+            />
             <div className="flex gap-3">
               <button onClick={submitDeliveryTime} className="flex-1 bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition font-semibold">
                 Confirm Order
               </button>
-              <button onClick={() => setShowDeliveryModal(false)} className="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-300 transition font-semibold">
+              <button onClick={() => { setShowDeliveryModal(false); setDeliveryTime(''); }} className="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-300 transition font-semibold">
                 Cancel
               </button>
             </div>
