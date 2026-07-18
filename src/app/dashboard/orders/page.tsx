@@ -17,6 +17,13 @@ export default function OrdersPage() {
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [deliveryTime, setDeliveryTime] = useState('');
+  
+  // Bulk delete states
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const email = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
@@ -40,33 +47,28 @@ export default function OrdersPage() {
 
   async function updateOrderStatus(orderId: string, newStatus: string, time?: string) {
     const { data: orderData } = await supabase
-      .from('orders')
-      .select('customer_chat_id, tracking_code, amount')
+      .from('orders')      .select('customer_chat_id, tracking_code, amount')
       .eq('id', orderId)
       .single();
     
     const updateData: any = { status: newStatus };
     if (time) updateData.delivery_time = time;
+
     const { error } = await supabase.from('orders').update(updateData).eq('id', orderId);
     
     if (!error) {
-      // 1. Agar order Confirm hua hai, toh PDF Invoice generate karke bhejo
       if (newStatus === 'Confirmed' && orderData?.customer_chat_id) {
         try {
           await fetch('/api/generate-invoice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              orderId: orderId, 
-              chatId: orderData.customer_chat_id 
-            })
+            body: JSON.stringify({ orderId, chatId: orderData.customer_chat_id })
           });
         } catch (err) {
           console.error('PDF generation failed:', err);
         }
       }
 
-      // 2. Customer ko text message bhi bhejo
       if (orderData?.customer_chat_id) {
         let message = '';
         if (newStatus === 'Confirmed') {
@@ -94,13 +96,11 @@ export default function OrdersPage() {
       alert(`Order ${newStatus}! Customer notified.`);
     }
   }
-
-  // 👇 YE FUNCTION MODAL OPEN KARTA HAI
-  function handleConfirmClick(orderId: string) {    setSelectedOrderId(orderId);
+  function handleConfirmClick(orderId: string) {
+    setSelectedOrderId(orderId);
     setShowDeliveryModal(true);
   }
 
-  // 👇 YE FUNCTION MODAL SE DELIVERY TIME LEKAR ORDER CONFIRM KARTA HAI
   function submitDeliveryTime() {
     if (selectedOrderId && deliveryTime) {
       updateOrderStatus(selectedOrderId, 'Confirmed', deliveryTime);
@@ -108,6 +108,58 @@ export default function OrdersPage() {
       setDeliveryTime('');
     }
   }
+
+  // Bulk Delete Functions
+  function toggleSelectOrder(orderId: string) {
+    setSelectedOrders(prev => 
+      prev.includes(orderId) 
+        ? prev.filter(id => id !== orderId)
+        : [...prev, orderId]
+    );
+  }
+
+  function selectAll(ordersToSelect: any[]) {
+    if (selectedOrders.length === ordersToSelect.length) {
+      setSelectedOrders([]);
+    } else {
+      setSelectedOrders(ordersToSelect.map(o => o.id));
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (selectedOrders.length === 0) return;
+
+    try {
+      const response = await fetch('/api/orders/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderIds: selectedOrders })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`${result.deleted} order(s) deleted successfully!`);
+        setSelectedOrders([]);
+        fetchData(localStorage.getItem('userEmail') || '');
+      } else {
+        alert(result.error || 'Failed to delete orders');
+      }
+    } catch (error) {      alert('Failed to delete orders');
+    }
+    setShowDeleteConfirm(false);
+  }
+
+  // Search Filter
+  const filteredOrders = orders.filter(order => {
+    const query = searchQuery.toLowerCase();
+    return (
+      order.customer_name?.toLowerCase().includes(query) ||
+      order.items?.toLowerCase().includes(query) ||
+      order.id?.toLowerCase().includes(query) ||
+      order.address?.toLowerCase().includes(query)
+    );
+  });
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50">Loading orders...</div>;
 
@@ -125,27 +177,73 @@ export default function OrdersPage() {
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+          <div className="px-8 py-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50">
             <div>
               <h2 className="text-xl font-bold text-gray-900">Order Management</h2>
-              <p className="text-sm text-gray-500 mt-1">Confirm or reject incoming orders from Telegram.</p>
+              <p className="text-sm text-gray-500 mt-1">Confirm, reject, or delete orders.</p>
             </div>
             <div className="flex gap-2">
               <span className="px-3 py-1 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-full text-xs font-bold">
                 Pending: {orders.filter(o => o.status === 'Pending').length}
               </span>
+              <span className="px-3 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-xs font-bold">
+                Completed: {orders.filter(o => o.status === 'Completed').length}
+              </span>
             </div>
           </div>
+
+          {/* Search Bar */}
+          <div className="px-8 py-4 border-b border-gray-100">
+            <input              type="text"
+              placeholder="🔍 Search by customer name, order ID, items, or address..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
+            />
+          </div>
+
+          {/* Bulk Actions */}
+          {selectedOrders.length > 0 && (
+            <div className="px-8 py-4 bg-blue-50 border-b border-blue-100 flex justify-between items-center">
+              <p className="text-sm text-blue-700 font-medium">
+                {selectedOrders.length} order(s) selected
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition text-sm font-semibold"
+                >
+                  🗑️ Delete Selected
+                </button>
+                <button
+                  onClick={() => setSelectedOrders([])}
+                  className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition text-sm font-semibold"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
           
-          {orders.length === 0 ? (
+          {filteredOrders.length === 0 ? (
             <div className="p-16 text-center text-gray-500">
               <div className="text-5xl mb-4">📭</div>
-              <p className="text-lg font-medium text-gray-900">No orders found.</p>
+              <p className="text-lg font-medium text-gray-900">
+                {searchQuery ? 'No orders found matching your search.' : 'No orders found.'}
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="bg-gray-50 text-gray-500 text-xs uppercase font-semibold tracking-wider">                  <tr>
+                <thead className="bg-gray-50 text-gray-500 text-xs uppercase font-semibold tracking-wider">
+                  <tr>
+                    <th className="px-8 py-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
+                        onChange={() => selectAll(filteredOrders)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                      />                    </th>
                     <th className="px-8 py-4">Order ID</th>
                     <th className="px-8 py-4">Customer</th>
                     <th className="px-8 py-4">Items</th>
@@ -156,50 +254,61 @@ export default function OrdersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-sm">
-                  {orders.map((order) => (
-                    <tr key={order.id} className="hover:bg-blue-50/40 transition-colors">
-                      <td className="px-8 py-5 font-mono font-medium text-blue-600">#{order.id ? order.id.slice(0, 8).toUpperCase() : 'N/A'}</td>
-                      <td className="px-8 py-5 font-medium text-gray-900">{order.customer_name || 'Unknown'}</td>
-                      <td className="px-8 py-5 text-gray-600 max-w-md" title={order.items}>{order.items}</td>
-                      <td className="px-8 py-5 font-bold text-gray-900">₹{order.amount || 0}</td>
-                      <td className="px-8 py-5">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
-                          order.status === 'Delivered' ? 'bg-green-50 text-green-700 border border-green-200' :
-                          order.status === 'Out for Delivery' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                          order.status === 'Confirmed' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' :
-                          order.status === 'Rejected' ? 'bg-red-50 text-red-700 border border-red-200' : 
-                          'bg-yellow-50 text-yellow-700 border border-yellow-200'
-                        }`}>
-                          {order.status === 'Delivered' ? '✓ ' : order.status === 'Rejected' ? '✗ ' : '⏳ '}{order.status}
-                        </span>
-                      </td>
-                      <td className="px-8 py-5 text-gray-500 whitespace-nowrap">{formatDate(order.created_at)}</td>
-                      <td className="px-8 py-5">
-                        {order.status === 'Pending' && (
-                          <div className="flex gap-2">
-                            <button onClick={() => handleConfirmClick(order.id)} className="text-xs bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition font-semibold shadow-sm">
-                              ✅ Confirm
+                  {filteredOrders.map((order) => {
+                    const canDelete = order.status === 'Delivered' || order.status === 'Rejected';
+                    return (
+                      <tr key={order.id} className={`hover:bg-blue-50/40 transition-colors ${!canDelete && selectedOrders.includes(order.id) ? 'bg-red-50' : ''}`}>
+                        <td className="px-8 py-5">
+                          <input
+                            type="checkbox"
+                            checked={selectedOrders.includes(order.id)}
+                            onChange={() => toggleSelectOrder(order.id)}
+                            disabled={!canDelete}
+                            className={`rounded border-gray-300 focus:ring-blue-600 ${!canDelete ? 'opacity-30 cursor-not-allowed' : 'text-blue-600'}`}
+                            title={!canDelete ? 'Only Delivered or Rejected orders can be deleted' : 'Select for deletion'}
+                          />
+                        </td>
+                        <td className="px-8 py-5 font-mono font-medium text-blue-600">#{order.id ? order.id.slice(0, 8).toUpperCase() : 'N/A'}</td>
+                        <td className="px-8 py-5 font-medium text-gray-900">{order.customer_name || 'Unknown'}</td>
+                        <td className="px-8 py-5 text-gray-600 max-w-md" title={order.items}>{order.items}</td>
+                        <td className="px-8 py-5 font-bold text-gray-900">₹{order.amount || 0}</td>
+                        <td className="px-8 py-5">
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
+                            order.status === 'Delivered' ? 'bg-green-50 text-green-700 border border-green-200' :
+                            order.status === 'Out for Delivery' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                            order.status === 'Confirmed' || order.status === 'Completed' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' :
+                            order.status === 'Rejected' ? 'bg-red-50 text-red-700 border border-red-200' : 
+                            'bg-yellow-50 text-yellow-700 border border-yellow-200'
+                          }`}>
+                            {order.status === 'Delivered' ? '✓ ' : order.status === 'Rejected' ? ' ' : '⏳ '}{order.status}
+                          </span>
+                        </td>
+                        <td className="px-8 py-5 text-gray-500 whitespace-nowrap">{formatDate(order.created_at)}</td>
+                        <td className="px-8 py-5">
+                          {order.status === 'Pending' && (
+                            <div className="flex gap-2">
+                              <button onClick={() => handleConfirmClick(order.id)} className="text-xs bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition font-semibold shadow-sm">
+                                ✅ Confirm
+                              </button>
+                              <button onClick={() => updateOrderStatus(order.id, 'Rejected')} className="text-xs bg-white text-red-600 border border-red-200 px-4 py-2 rounded-lg hover:bg-red-50 transition font-semibold">
+                                ❌ Reject
+                              </button>                            </div>
+                          )}
+                          {order.status === 'Confirmed' || order.status === 'Completed' ? (
+                            <button onClick={() => updateOrderStatus(order.id, 'Out for Delivery')} className="text-xs bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-semibold shadow-sm">
+                              🚴 Out for Delivery
                             </button>
-                            <button onClick={() => updateOrderStatus(order.id, 'Rejected')} className="text-xs bg-white text-red-600 border border-red-200 px-4 py-2 rounded-lg hover:bg-red-50 transition font-semibold">
-                              ❌ Reject
+                          ) : order.status === 'Out for Delivery' ? (
+                            <button onClick={() => updateOrderStatus(order.id, 'Delivered')} className="text-xs bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition font-semibold shadow-sm">
+                              ✓ Mark Delivered
                             </button>
-                          </div>
-                        )}
-                        {order.status === 'Confirmed' && (
-                          <button onClick={() => updateOrderStatus(order.id, 'Out for Delivery')} className="text-xs bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-semibold shadow-sm">
-                            🚴 Out for Delivery
-                          </button>
-                        )}
-                        {order.status === 'Out for Delivery' && (
-                          <button onClick={() => updateOrderStatus(order.id, 'Delivered')} className="text-xs bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition font-semibold shadow-sm">
-                            ✓ Mark Delivered
-                          </button>
-                        )}                        {(order.status === 'Delivered' || order.status === 'Rejected') && (
-                          <span className="text-xs text-gray-400 font-medium italic">Processed</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                          ) : order.status === 'Delivered' || order.status === 'Rejected' ? (
+                            <span className="text-xs text-gray-400 font-medium italic">Processed</span>
+                          ) : null}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -226,6 +335,26 @@ export default function OrdersPage() {
                 Confirm Order
               </button>
               <button onClick={() => { setShowDeliveryModal(false); setDeliveryTime(''); }} className="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-300 transition font-semibold">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">️ Confirm Deletion</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Are you sure you want to delete {selectedOrders.length} order(s)?<br/><br/>
+              <span className="text-red-600 font-semibold">This action cannot be undone!</span>
+            </p>
+            <div className="flex gap-3">
+              <button onClick={handleBulkDelete} className="flex-1 bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 transition font-semibold">
+                🗑️ Yes, Delete
+              </button>
+              <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-300 transition font-semibold">
                 Cancel
               </button>
             </div>
