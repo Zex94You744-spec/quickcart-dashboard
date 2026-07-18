@@ -14,13 +14,18 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const email = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
+    const role = typeof window !== 'undefined' ? localStorage.getItem('userRole') : null;
     
-    // Check if admin
-    if (email !== 'devbusines01@gmail.com') {
+    console.log('🔍 Admin Dashboard checking auth:', { email, role });
+
+    // Check if admin (thoda flexible check)
+    if (!email || (email !== 'devbusines01@gmail.com' && role !== 'admin')) {
+      console.log('🚫 Not admin, redirecting to login');
       router.push('/login');
       return;
     }
     
+    console.log('✅ Admin verified, fetching users...');
     fetchUsers();
   }, []);
 
