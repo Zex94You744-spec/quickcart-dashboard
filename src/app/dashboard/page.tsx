@@ -15,7 +15,16 @@ export default function UserDashboard() {
 
   useEffect(() => {
     const email = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
+    const role = typeof window !== 'undefined' ? localStorage.getItem('userRole') : null;
+    
     if (email) {
+      // ✅ AGAR ADMIN HAI, TOH SEEDHA ADMIN DASHBOARD PAR BHEJ DO
+      if (role === 'admin' || email === 'devbusines01@gmail.com' || email === 'support@quickcart.com') {
+        window.location.replace('/admin/dashboard');
+        return;
+      }
+      
+      // Agar normal user hai, toh uska data fetch karo
       fetchUserData(email);
     } else {
       router.push('/login');
