@@ -61,7 +61,10 @@ export default function UserDashboard() {
   }
 
   // ✅ FIXED: Ab ye status aur plan dono ko check karega
-  const isPaid = user.subscription_status === 'active' || user.subscription_plan === 'pro' || user.subscription_plan === 'premium';
+  const isPaid = 
+    user.subscription_status === 'active' || 
+    user.subscription_status === 'paid' || 
+    user.subscription_status === 'premium';
   
   const totalOrders = orders.length;
   const totalRevenue = orders.reduce((sum, order) => sum + (Number(order.amount) || 0), 0);

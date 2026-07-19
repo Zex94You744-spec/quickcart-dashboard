@@ -66,11 +66,8 @@ export default function AdminDashboard() {
   // ✅ SMART CHECK: Ab ye status aur plan DONO ko check karega (Bilkul User Dashboard ki tarah)
   const isActiveUser = (u: any) => {
     return u.subscription_status === 'active' || 
-           u.subscription_status === 'pro' || 
            u.subscription_status === 'paid' || 
-           u.subscription_status === 'premium' ||
-           u.subscription_plan === 'pro' || 
-           u.subscription_plan === 'premium';
+           u.subscription_status === 'premium';
   };
 
   const activeCount = users.filter(u => isActiveUser(u)).length;
