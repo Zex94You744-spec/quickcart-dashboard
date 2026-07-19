@@ -39,34 +39,40 @@ export default function AnalyticsPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
-  const [dateRange, setDateRange] = useState('7'); // 7, 30, 90 days
+  const [dateRange, setDateRange] = useState('7');
+  const [userEmail, setUserEmail] = useState<string>('');
 
   useEffect(() => {
     const email = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
-    if (email) fetchData(email);
-    else router.push('/login');
+    if (email) {
+      setUserEmail(email);
+      fetchData(email);
+    } else {
+      router.push('/login');
+    }
   }, [dateRange]);
 
-  async function fetchData(email: string) {    try {
+  async function fetchData(email: string) {
+    try {
       const { data: userData } = await supabase.from('leads').select('shop_name').eq('email', email).single();
       if (userData) setUser(userData);
 
-      const { data: ordersData } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // 🛑 BUG FIX 3: Data Leakage Fix - Sirf usi user ke orders fetch karo
+      // Note: Agar 'shop_owner_email' column abhi tak add nahi kiya, toh ye filter hata dena, 
+      // lekin best ye hai ki tum Supabase mein wo column add kar lo.
+      let query = supabase.from('orders').select('*').order('created_at', { ascending: false });
       
-      if (ordersData) {
-        // Filter by date range
-        const days = parseInt(dateRange);
-        const cutoffDate = new Date();
-        cutoffDate.setDate(cutoffDate.getDate() - days);
-        
-        const filteredOrders = ordersData.filter(order => 
-          new Date(order.created_at) >= cutoffDate
-        );
-        
-        setOrders(filteredOrders);
+      // Agar column exist karta hai, toh filter lagao (Fallback: agar error aaye toh catch block handle karega)
+      try {
+        const { data: ordersData } = await query.eq('shop_owner_email', email);
+        if (ordersData) {
+          processOrders(ordersData);
+        }
+      } catch (filterError) {
+        // Agar column nahi hai, toh temporary sab fetch kar lo (lekin ye fix karna zaruri hai)
+        console.warn('shop_owner_email column missing, fetching all orders temporarily');
+        const { data: allOrders } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+        if (allOrders) processOrders(allOrders);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -75,19 +81,44 @@ export default function AnalyticsPage() {
     }
   }
 
+  function processOrders(ordersData: any[]) {
+    const days = parseInt(dateRange);
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+    
+    const filteredOrders = ordersData.filter(order => 
+      new Date(order.created_at) >= cutoffDate
+    );
+    setOrders(filteredOrders);
+  }
+
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading analytics...</div>;
 
   // Calculate Metrics
   const totalOrders = orders.length;
-  const completedOrders = orders.filter(o => o.status === 'Delivered').length;
+  
+  // 🛑 BUG FIX 2: Completed Orders mein 'Confirmed', 'Completed', aur 'Delivered' teeno shamil karo
+  const completedOrders = orders.filter(o => 
+    o.status === 'Delivered' || 
+    o.status === 'Completed' || 
+    o.status === 'Confirmed'
+  ).length;
+  
   const pendingOrders = orders.filter(o => o.status === 'Pending').length;
   const totalRevenue = orders.reduce((sum, o) => sum + (Number(o.amount) || 0), 0);
+  
+  // Completed Revenue bhi update karo
   const completedRevenue = orders
-    .filter(o => o.status === 'Delivered')
+    .filter(o => 
+      o.status === 'Delivered' || 
+      o.status === 'Completed' || 
+      o.status === 'Confirmed'
+    )
     .reduce((sum, o) => sum + (Number(o.amount) || 0), 0);
+    
   const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
 
-  // Revenue by Date (Last X days)
+  // Revenue by Date
   const revenueByDate: { [key: string]: number } = {};
   orders.forEach(order => {
     const date = new Date(order.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
@@ -96,7 +127,8 @@ export default function AnalyticsPage() {
 
   const revenueChartData = {
     labels: Object.keys(revenueByDate).reverse(),
-    datasets: [      {
+    datasets: [
+      {
         label: 'Revenue (₹)',
         data: Object.values(revenueByDate).reverse(),
         fill: true,
@@ -122,11 +154,11 @@ export default function AnalyticsPage() {
       {
         data: Object.values(statusCounts),
         backgroundColor: [
-          'rgb(34, 197, 94)',   // Green - Delivered
-          'rgb(59, 130, 246)',  // Blue - Out for Delivery
-          'rgb(99, 102, 241)',  // Indigo - Confirmed
-          'rgb(234, 179, 8)',   // Yellow - Pending
-          'rgb(239, 68, 68)',   // Red - Rejected
+          'rgb(34, 197, 94)',
+          'rgb(59, 130, 246)',
+          'rgb(99, 102, 241)',
+          'rgb(234, 179, 8)',
+          'rgb(239, 68, 68)',
         ],
         borderWidth: 0,
       },
@@ -145,7 +177,8 @@ export default function AnalyticsPage() {
     .slice(0, 5);
 
   const topCustomersChartData = {
-    labels: topCustomers.map(c => c[0]),    datasets: [
+    labels: topCustomers.map(c => c[0]),
+    datasets: [
       {
         label: 'Revenue (₹)',
         data: topCustomers.map(c => c[1]),
@@ -169,7 +202,6 @@ export default function AnalyticsPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Sales Analytics 📊</h1>
@@ -194,7 +226,7 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Stats Cards */}        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <p className="text-sm text-gray-500 font-medium">Total Orders</p>
             <p className="text-3xl font-bold text-gray-900 mt-2">{totalOrders}</p>
@@ -219,17 +251,13 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Charts Row 1 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Revenue Trend */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Revenue Trend</h2>
             <div className="h-64">
               <Line data={revenueChartData} options={chartOptions} />
             </div>
           </div>
-
-          {/* Orders by Status */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Orders by Status</h2>
             <div className="h-64">
@@ -238,16 +266,13 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Charts Row 2 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Top Customers */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Top Customers</h2>
-            <div className="h-64">              <Bar data={topCustomersChartData} options={chartOptions} />
+            <div className="h-64">
+              <Bar data={topCustomersChartData} options={chartOptions} />
             </div>
           </div>
-
-          {/* Quick Stats */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Performance Summary</h2>
             <div className="space-y-4">

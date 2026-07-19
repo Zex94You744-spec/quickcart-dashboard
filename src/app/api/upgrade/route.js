@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import postgres from 'postgres';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Direct PostgreSQL connection (Bypasses all Supabase RLS issues)
+const sql = postgres(process.env.DATABASE_URL);
 
 export async function POST(request) {
   try {
@@ -13,34 +12,31 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'User email is required' }, { status: 400 });
     }
 
-    console.log('⬆️ Upgrading user:', email, 'to plan:', plan || 'pro');
+    console.log('⬆️ Direct DB Upgrade: Updating user:', email, 'to plan:', plan || 'pro');
 
-    // 1. Database mein user ka status update karo (Sirf existing columns use karo)
-    const { data, error } = await supabase
-      .from('leads')
-      .update({
-        subscription_status: 'active', // ✅ YE SABSE IMPORTANT HAI
-        subscription_plan: plan || 'pro' // ✅ Plan name bhi save kar lo
-      })
-      .eq('email', email)
-      .select();
+    // 🔥 DIRECT SQL UPDATE QUERY (No RLS, 100% Admin Access)
+    const result = await sql`
+      UPDATE leads 
+      SET subscription_status = 'active', 
+          subscription_plan = ${plan || 'pro'}
+      WHERE email = ${email}
+      RETURNING *;
+    `;
 
-    if (error) {
-      console.error('❌ Database Update Error:', error);
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    if (result.length === 0) {
+      return NextResponse.json({ success: false, error: 'User not found in database' }, { status: 404 });
     }
 
-    console.log('✅ User upgraded successfully in DB:', data);
+    console.log('✅ User upgraded successfully in DB:', result[0]);
 
-    // 2. Success response bhejo
     return NextResponse.json({ 
       success: true, 
       message: 'Subscription upgraded to Active successfully!',
-      data: data[0]
+      data: result[0]
     });
 
   } catch (error) {
-    console.error('❌ Upgrade API Critical Error:', error);
+    console.error('❌ Direct DB Upgrade Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

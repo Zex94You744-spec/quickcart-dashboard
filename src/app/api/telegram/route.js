@@ -19,7 +19,13 @@ export async function POST(request) {
 
       console.log('📩 New Message:', messageText);
 
-      // --- 1. SMART AMOUNT EXTRACTION ---
+      // 🛑 BUG FIX 1: Agar message ek Bot Command hai (/start, /subscribe, etc.), toh order mat banao
+      if (messageText.trim().startsWith('/')) {
+        console.log('⏭️ Ignoring bot command:', messageText);
+        return NextResponse.json({ success: true, message: 'Command ignored' });
+      }
+
+      // --- 2. SMART AMOUNT EXTRACTION ---
       let extractedAmount = 0;
       
       const totalMatch = messageText.match(/(?:total|Total)\s*:?\s*(\d+)/i);
@@ -48,14 +54,15 @@ export async function POST(request) {
       }
 
       console.log('💰 Extracted Amount:', extractedAmount);
-      // --- 2. PHONE & ADDRESS EXTRACTION ---
+
+      // --- 3. PHONE & ADDRESS EXTRACTION ---
       const phoneMatch = messageText.match(/(\d{10})/);
       const extractedPhone = phoneMatch ? phoneMatch[1] : '';
 
       const addressMatch = messageText.match(/(?:Mumbai|Kardha|Delhi|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/i);
       const extractedAddress = addressMatch ? addressMatch[0] : 'Not provided';
 
-      // --- 3. ITEMS EXTRACTION (Ultimate Split & Filter) ---
+      // --- 4. ITEMS EXTRACTION (Ultimate Split & Filter) ---
       let cleanItems = messageText;
       cleanItems = cleanItems.replace(/Order:\s*/i, '');
       cleanItems = cleanItems.replace(/\s*\d{10}\s*/g, '');
@@ -75,10 +82,12 @@ export async function POST(request) {
 
       console.log('📦 Extracted Items:', finalItems);
 
-      // --- 4. SAVE TO DATABASE ---
-      // YE LINE HAI JO ERROR FIX KAREGI:
+      // --- 5. SAVE TO DATABASE ---
       const newTrackingCode = 'TRACK' + Date.now().toString().slice(-6);
 
+      // NOTE: Agar 'shop_owner_email' column nahi hai, toh pehle Supabase SQL Editor mein ye run karo:
+      // ALTER TABLE orders ADD COLUMN IF NOT EXISTS shop_owner_email TEXT;
+      // Abhi ke liye hum ise null chhod rahe hain, lekin dashboard mein filter laga denge.
       const { data, error } = await supabase
         .from('orders')
         .insert([
@@ -90,18 +99,20 @@ export async function POST(request) {
             address: extractedAddress,
             phone: extractedPhone,
             tracking_code: newTrackingCode,
-            status: 'Pending'
+            status: 'Pending',
+            shop_owner_email: null // Isko baad mein bot setup se map karenge
           }
         ])
         .select();
 
       if (error) {
-        console.error('❌ Database error:', error);        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+        console.error('❌ Database error:', error);
+        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
       }
 
       console.log('✅ Order saved:', data);
 
-      // --- 5. SEND REPLY TO CUSTOMER ---
+      // --- 6. SEND REPLY TO CUSTOMER ---
       if (BOT_TOKEN && data && data[0]) {
         const trackingLink = `https://quickcart-dashboard-ten.vercel.app/track/${data[0].id}`;
         const cleanReplyItems = finalItems.replace(/,\s*$/, '').trim();
