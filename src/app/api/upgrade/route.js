@@ -15,14 +15,12 @@ export async function POST(request) {
 
     console.log('⬆️ Upgrading user:', email, 'to plan:', plan || 'pro');
 
-    // 1. Database mein user ka status update karo
+    // 1. Database mein user ka status update karo (Sirf existing columns use karo)
     const { data, error } = await supabase
       .from('leads')
       .update({
-        subscription_status: 'active', // ✅ YE LINE SABSE IMPORTANT HAI
-        plan: plan || 'pro',
-        last_payment_id: paymentId || 'manual_upgrade',
-        updated_at: new Date().toISOString()
+        subscription_status: 'active', // ✅ YE SABSE IMPORTANT HAI
+        subscription_plan: plan || 'pro' // ✅ Plan name bhi save kar lo
       })
       .eq('email', email)
       .select();
