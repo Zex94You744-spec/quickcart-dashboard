@@ -19,8 +19,7 @@ export default function AdminDashboard() {
     
     setAdminEmail(email || '');
 
-    // Security Check: Agar admin nahi hai, toh wapas login par bhej do
-    if (!email || role !== 'admin') {
+    if (!email || (email !== 'devbusines01@gmail.com' && email !== 'support@quickcart.com' && role !== 'admin')) {
       window.location.replace('/login');
       return;
     }
@@ -36,10 +35,10 @@ export default function AdminDashboard() {
         .order('created_at', { ascending: false });
       
       if (data) {
-        // Admin accounts ko list se hata do taaki sirf real shop owners dikhein
         const realUsers = data.filter(u => 
           u.email !== 'devbusines01@gmail.com' && 
-          u.email !== 'support@quickcart.com'
+          u.email !== 'support@quickcart.com' &&
+          u.email !== 'support@quickcart.com.com'
         );
         setUsers(realUsers);
       }
@@ -63,6 +62,19 @@ export default function AdminDashboard() {
       </div>
     );
   }
+
+  // ✅ SMART CHECK: Ab ye status aur plan DONO ko check karega (Bilkul User Dashboard ki tarah)
+  const isActiveUser = (u: any) => {
+    return u.subscription_status === 'active' || 
+           u.subscription_status === 'pro' || 
+           u.subscription_status === 'paid' || 
+           u.subscription_status === 'premium' ||
+           u.subscription_plan === 'pro' || 
+           u.subscription_plan === 'premium';
+  };
+
+  const activeCount = users.filter(u => isActiveUser(u)).length;
+  const trialCount = users.filter(u => !isActiveUser(u)).length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -96,15 +108,11 @@ export default function AdminDashboard() {
           </div>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <p className="text-sm text-gray-500 font-medium">Active Subscriptions</p>
-            <p className="text-3xl font-bold text-green-600 mt-2">
-              {users.filter(u => u.subscription_status === 'active' || u.subscription_status === 'pro').length}
-            </p>
+            <p className="text-3xl font-bold text-green-600 mt-2">{activeCount}</p>
           </div>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-            <p className="text-sm text-gray-500 font-medium">Trial Users</p>
-            <p className="text-3xl font-bold text-orange-600 mt-2">
-              {users.filter(u => u.subscription_status === 'new' || u.subscription_status === 'trial').length}
-            </p>
+            <p className="text-sm text-gray-500 font-medium">Trial / New Users</p>
+            <p className="text-3xl font-bold text-orange-600 mt-2">{trialCount}</p>
           </div>
         </div>
 
@@ -118,9 +126,7 @@ export default function AdminDashboard() {
           </div>
           
           {users.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              No shop owners registered yet.
-            </div>
+            <div className="p-8 text-center text-gray-500">No shop owners registered yet.</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left">
@@ -135,26 +141,29 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-sm">
-                  {users.map((user) => (
-                    <tr key={user.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 font-medium text-gray-900">{user.name || 'N/A'}</td>
-                      <td className="px-6 py-4 text-gray-600">{user.shop_name || 'N/A'}</td>
-                      <td className="px-6 py-4 text-gray-600">{user.email}</td>
-                      <td className="px-6 py-4 text-gray-600">{user.phone || 'N/A'}</td>
-                      <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          user.subscription_status === 'active' || user.subscription_status === 'pro'
-                            ? 'bg-green-50 text-green-700 border border-green-200' 
-                            : 'bg-orange-50 text-orange-700 border border-orange-200'
-                        }`}>
-                          {user.subscription_status === 'active' || user.subscription_status === 'pro' ? '✅ Active' : '⏳ Trial'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-gray-500">
-                        {new Date(user.created_at).toLocaleDateString('en-IN')}
-                      </td>
-                    </tr>
-                  ))}
+                  {users.map((user) => {
+                    const isPaid = isActiveUser(user);
+                    return (
+                      <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 font-medium text-gray-900">{user.name || 'N/A'}</td>
+                        <td className="px-6 py-4 text-gray-600">{user.shop_name || 'N/A'}</td>
+                        <td className="px-6 py-4 text-gray-600">{user.email}</td>
+                        <td className="px-6 py-4 text-gray-600">{user.phone || 'N/A'}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            isPaid
+                              ? 'bg-green-50 text-green-700 border border-green-200' 
+                              : 'bg-orange-50 text-orange-700 border border-orange-200'
+                          }`}>
+                            {isPaid ? `✅ ${user.subscription_plan ? user.subscription_plan.toUpperCase() : 'ACTIVE'}` : '⏳ Trial'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-gray-500">
+                          {new Date(user.created_at).toLocaleDateString('en-IN')}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
