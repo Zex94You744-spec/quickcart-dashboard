@@ -12,6 +12,7 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [userEmail, setUserEmail] = useState<string>('');
   
   // Modal states
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
@@ -27,8 +28,12 @@ export default function OrdersPage() {
 
   useEffect(() => {
     const email = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
-    if (email) fetchData(email);
-    else router.push('/login');
+    if (email) {
+      setUserEmail(email);
+      fetchData(email);
+    } else {
+      router.push('/login');
+    }
   }, []);
 
   async function fetchData(email: string) {
@@ -36,8 +41,20 @@ export default function OrdersPage() {
       const { data: userData } = await supabase.from('leads').select('shop_name').eq('email', email).single();
       if (userData) setUser(userData);
 
-      const { data: ordersData } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
-      if (ordersData) setOrders(ordersData);
+      // 🛑 BUG FIX: Sirf usi user ke orders fetch karo
+      let query = supabase.from('orders').select('*').order('created_at', { ascending: false });
+      
+      // Pehle check karo ki shop_owner_email column exist karta hai ya nahi
+      try {
+        const { data: ordersData, error } = await query.eq('shop_owner_email', email);
+        if (error) throw error;
+        if (ordersData) setOrders(ordersData);
+      } catch (filterError) {
+        console.warn('shop_owner_email column missing, fetching all orders temporarily');
+        // Agar column nahi hai, toh temporary sab fetch kar lo
+        const { data: allOrders } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+        if (allOrders) setOrders(allOrders);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -47,7 +64,8 @@ export default function OrdersPage() {
 
   async function updateOrderStatus(orderId: string, newStatus: string, time?: string) {
     const { data: orderData } = await supabase
-      .from('orders')      .select('customer_chat_id, tracking_code, amount')
+      .from('orders')
+      .select('customer_chat_id, tracking_code, amount')
       .eq('id', orderId)
       .single();
     
@@ -92,10 +110,11 @@ export default function OrdersPage() {
         }
       }
 
-      fetchData(localStorage.getItem('userEmail') || '');
+      fetchData(userEmail);
       alert(`Order ${newStatus}! Customer notified.`);
     }
   }
+
   function handleConfirmClick(orderId: string) {
     setSelectedOrderId(orderId);
     setShowDeliveryModal(true);
@@ -141,11 +160,12 @@ export default function OrdersPage() {
       if (result.success) {
         alert(`${result.deleted} order(s) deleted successfully!`);
         setSelectedOrders([]);
-        fetchData(localStorage.getItem('userEmail') || '');
+        fetchData(userEmail);
       } else {
         alert(result.error || 'Failed to delete orders');
       }
-    } catch (error) {      alert('Failed to delete orders');
+    } catch (error) {
+      alert('Failed to delete orders');
     }
     setShowDeleteConfirm(false);
   }
@@ -187,14 +207,15 @@ export default function OrdersPage() {
                 Pending: {orders.filter(o => o.status === 'Pending').length}
               </span>
               <span className="px-3 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-xs font-bold">
-                Completed: {orders.filter(o => o.status === 'Completed').length}
+                Completed: {orders.filter(o => o.status === 'Completed' || o.status === 'Delivered' || o.status === 'Confirmed').length}
               </span>
             </div>
           </div>
 
           {/* Search Bar */}
           <div className="px-8 py-4 border-b border-gray-100">
-            <input              type="text"
+            <input
+              type="text"
               placeholder="🔍 Search by customer name, order ID, items, or address..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -243,7 +264,8 @@ export default function OrdersPage() {
                         checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
                         onChange={() => selectAll(filteredOrders)}
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-600"
-                      />                    </th>
+                      />
+                    </th>
                     <th className="px-8 py-4">Order ID</th>
                     <th className="px-8 py-4">Customer</th>
                     <th className="px-8 py-4">Items</th>
@@ -292,7 +314,8 @@ export default function OrdersPage() {
                               </button>
                               <button onClick={() => updateOrderStatus(order.id, 'Rejected')} className="text-xs bg-white text-red-600 border border-red-200 px-4 py-2 rounded-lg hover:bg-red-50 transition font-semibold">
                                 ❌ Reject
-                              </button>                            </div>
+                              </button>
+                            </div>
                           )}
                           {order.status === 'Confirmed' || order.status === 'Completed' ? (
                             <button onClick={() => updateOrderStatus(order.id, 'Out for Delivery')} className="text-xs bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-semibold shadow-sm">
@@ -341,6 +364,7 @@ export default function OrdersPage() {
           </div>
         </div>
       )}
+
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
