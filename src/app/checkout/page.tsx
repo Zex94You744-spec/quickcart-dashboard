@@ -91,7 +91,6 @@ export default function CheckoutPage() {
     setLoading(false);
   }
 
-  // --- FIXED: UPGRADE API INTEGRATION ---
   async function handlePayment(planId: string) {
     if (!leadId || !lead) return;
     setProcessing(true);
@@ -104,15 +103,14 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           email: lead.email,
           plan: planId,
-          paymentId: 'pay_test_' + Date.now() // Mock ID, baad mein Razorpay ID aayegi
+          paymentId: 'pay_test_' + Date.now()
         })
       });
 
       const upgradeResult = await upgradeResponse.json();
 
       if (upgradeResult.success) {
-        alert('✅ Subscription Activated Successfully! Redirecting to payment...');
-        
+        // 2. Agar upgrade successful hai, toh payment link generate karo
         const paymentResponse = await fetch('/api/payment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -124,7 +122,6 @@ export default function CheckoutPage() {
         if (paymentResult.success && paymentResult.paymentUrl) {
           window.location.href = paymentResult.paymentUrl;
         } else {
-          // Agar payment link generate nahi hua, toh bhi user upgrade ho chuka hai
           alert('✅ You are now on the Pro Plan! Redirecting to dashboard...');
           window.location.href = '/dashboard';
         }
@@ -133,28 +130,12 @@ export default function CheckoutPage() {
         console.error('Upgrade Error Details:', upgradeResult);
         setProcessing(false);
       }
-
-        const paymentResult = await paymentResponse.json();
-
-        if (paymentResult.success && paymentResult.paymentUrl) {
-          // Razorpay page par redirect karo
-          window.location.href = paymentResult.paymentUrl;
-        } else {
-          // Agar payment API fail hota hai (test mode mein), tab bhi user upgrade ho chuka hai
-          alert('✅ Subscription Activated Successfully! Redirecting to dashboard...');
-          window.location.href = '/dashboard';
-        }
-      } else {
-        alert('❌ Upgrade failed: ' + (upgradeResult.error || 'Unknown error'));
-        setProcessing(false);
-      }
     } catch (error) {
       console.error('Payment/Upgrade error:', error);
       alert('❌ Failed to process upgrade. Please try again.');
       setProcessing(false);
     }
   }
-  // --------------------------------------
 
   if (loading) {
     return (
