@@ -48,6 +48,7 @@ export default function UserDashboard() {
       </div>
     );
   }
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -59,7 +60,9 @@ export default function UserDashboard() {
     );
   }
 
-  const isPaid = user.subscription_status === 'active';
+  // ✅ FIXED: Ab ye status aur plan dono ko check karega
+  const isPaid = user.subscription_status === 'active' || user.subscription_plan === 'pro' || user.subscription_plan === 'premium';
+  
   const totalOrders = orders.length;
   const totalRevenue = orders.reduce((sum, order) => sum + (Number(order.amount) || 0), 0);
   const pendingOrders = orders.filter(o => o.status === 'Pending').length;
@@ -73,7 +76,7 @@ export default function UserDashboard() {
       days.push(d.toISOString().split('T')[0]);
     }
     return days.map(date => {
-      const dayOrders = orders.filter(o => o.created_at && o.created_at.startsWith(date) && o.status === 'Completed');
+      const dayOrders = orders.filter(o => o.created_at && o.created_at.startsWith(date) && (o.status === 'Completed' || o.status === 'Delivered'));
       const revenue = dayOrders.reduce((sum, o) => sum + (Number(o.amount) || 0), 0);
       return { date: date.slice(5), revenue };
     });
@@ -91,13 +94,15 @@ export default function UserDashboard() {
           <span className="font-semibold text-gray-800 text-lg">{user.shop_name}</span>
         </div>
         <div className="flex items-center gap-4">
+          {/* ✅ FIXED: Badge ab plan ka naam bhi dikhayega */}
           <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider ${isPaid ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-orange-50 text-orange-700 border border-orange-200'}`}>
-            {isPaid ? '✅ Active Plan' : '⏳ Trial Mode'}
+            {isPaid ? `✅ ${user.subscription_plan ? user.subscription_plan.toUpperCase() : 'ACTIVE'} PLAN` : '⏳ TRIAL MODE'}
           </span>
-          <button 
-            onClick={() => { 
-              localStorage.removeItem('userEmail');               router.push('/login'); 
-            }} 
+          <button
+            onClick={() => {
+              localStorage.removeItem('userEmail');
+              router.push('/login');
+            }}
             className="text-sm text-gray-500 hover:text-red-600 font-medium px-3 py-1.5 rounded-lg hover:bg-red-50 transition"
           >
             Logout
@@ -106,7 +111,7 @@ export default function UserDashboard() {
       </nav>
 
       <div className="max-w-7xl mx-auto px-6 py-10 space-y-8">
-        
+
         {/* 2. Welcome Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -114,8 +119,8 @@ export default function UserDashboard() {
             <p className="text-gray-500 mt-1">Here is an overview of your store performance today.</p>
           </div>
           {!isPaid && (
-            <a 
-              href={`/checkout?lead_id=${user.id}`} 
+            <a
+              href={`/checkout?lead_id=${user.id}`}
               className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition shadow-md shadow-blue-200 flex items-center gap-2 whitespace-nowrap"
             >
               💳 Complete Payment Now
@@ -145,14 +150,15 @@ export default function UserDashboard() {
         <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-bold text-gray-900">Revenue Overview (Last 7 Days)</h2>
-            <span className="text-xs font-medium text-gray-400 bg-gray-50 px-3 py-1 rounded-full">Completed Orders Only</span>          </div>
+            <span className="text-xs font-medium text-gray-400 bg-gray-50 px-3 py-1 rounded-full">Completed Orders Only</span>
+          </div>
           <div className="flex items-end justify-between gap-2 h-40">
             {chartData.map((day, idx) => {
               const heightPercent = (day.revenue / maxRevenue) * 100;
               return (
                 <div key={idx} className="flex-1 flex flex-col items-center gap-2 group">
                   <div className="relative w-full flex justify-center">
-                    <div 
+                    <div
                       className="w-full max-w-[40px] bg-blue-100 rounded-t-lg group-hover:bg-blue-200 transition-all duration-300 relative"
                       style={{ height: `${Math.max(heightPercent, 4)}px` }}
                     >
@@ -170,7 +176,7 @@ export default function UserDashboard() {
           </div>
         </div>
 
-        {/* 5. Quick Actions (Orders table yahan se hata diya, ab Manage Orders card hai) */}
+        {/* 5. Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <a href="/dashboard/orders" className="bg-white p-6 rounded-2xl border border-gray-100 hover:border-blue-300 hover:shadow-lg transition-all duration-300 flex items-center gap-4 group">
             <div className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform duration-300">
@@ -194,7 +200,8 @@ export default function UserDashboard() {
             <div className="w-14 h-14 bg-gray-50 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform duration-300">
               ⚙️
             </div>
-            <div>              <h3 className="font-bold text-gray-900 text-lg">Bot Setup Guide</h3>
+            <div>
+              <h3 className="font-bold text-gray-900 text-lg">Bot Setup Guide</h3>
               <p className="text-sm text-gray-500">Connect your Telegram bot</p>
             </div>
           </a>

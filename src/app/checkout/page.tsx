@@ -111,12 +111,28 @@ export default function CheckoutPage() {
       const upgradeResult = await upgradeResponse.json();
 
       if (upgradeResult.success) {
-        // 2. Agar upgrade successful hai, toh payment link generate karo
+        alert('✅ Subscription Activated Successfully! Redirecting to payment...');
+        
         const paymentResponse = await fetch('/api/payment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ leadId, plan: planId })
         });
+
+        const paymentResult = await paymentResponse.json();
+
+        if (paymentResult.success && paymentResult.paymentUrl) {
+          window.location.href = paymentResult.paymentUrl;
+        } else {
+          // Agar payment link generate nahi hua, toh bhi user upgrade ho chuka hai
+          alert('✅ You are now on the Pro Plan! Redirecting to dashboard...');
+          window.location.href = '/dashboard';
+        }
+      } else {
+        alert('❌ Upgrade failed: ' + (upgradeResult.error || 'Unknown error'));
+        console.error('Upgrade Error Details:', upgradeResult);
+        setProcessing(false);
+      }
 
         const paymentResult = await paymentResponse.json();
 
