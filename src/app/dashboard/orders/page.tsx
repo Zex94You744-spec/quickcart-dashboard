@@ -41,20 +41,15 @@ export default function OrdersPage() {
       const { data: userData } = await supabase.from('leads').select('shop_name').eq('email', email).single();
       if (userData) setUser(userData);
 
-      // 🛑 BUG FIX: Sirf usi user ke orders fetch karo
-      let query = supabase.from('orders').select('*').order('created_at', { ascending: false });
+      // ⚠️ TEMP FIX: shop_owner_email column abhi database mein NULL hai.
+      // Isliye filter hata rahe hain taaki Orders page aur Dashboard same data dikhayein.
+      // (Asli data leakage fix karne ke liye humein Telegram Bot ko Shop Owner se map karna padega)
+      const { data: ordersData } = await supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false });
       
-      // Pehle check karo ki shop_owner_email column exist karta hai ya nahi
-      try {
-        const { data: ordersData, error } = await query.eq('shop_owner_email', email);
-        if (error) throw error;
-        if (ordersData) setOrders(ordersData);
-      } catch (filterError) {
-        console.warn('shop_owner_email column missing, fetching all orders temporarily');
-        // Agar column nahi hai, toh temporary sab fetch kar lo
-        const { data: allOrders } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
-        if (allOrders) setOrders(allOrders);
-      }
+      if (ordersData) setOrders(ordersData);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
