@@ -10,7 +10,6 @@ export async function POST(request) {
   try {
     const body = await request.json();
     
-    // Agar message nahi hai, toh kuch mat karo
     if (!body.message) {
       return NextResponse.json({ success: true });
     }
@@ -19,23 +18,48 @@ export async function POST(request) {
     const text = body.message.text || '';
     const firstName = body.message.from.first_name || 'User';
 
-    console.log(' New Message:', text);
+    console.log('📩 New Message:', text);
 
-    // 1. Bot Commands (/start, /subscribe) ko ignore karo
+    // 1. Bot Commands ko ignore karo
     if (text.trim().startsWith('/')) {
       console.log('⏭️ Ignoring command:', text);
       return NextResponse.json({ success: true });
     }
 
-    // 2. Simple Amount aur Phone Extraction (Jo crash na ho)
+    // 2. SMART Amount Extraction (Pehle 'total' dhundho, warna sabse bada number lo)
     let amount = 0;
-    const amountMatch = text.match(/(\d+)/);
-    if (amountMatch) amount = parseInt(amountMatch[1]);
+    const totalMatch = text.match(/(?:total|Total|amount|Amount)\s*:?\s*(\d+)/i);
+    if (totalMatch) {
+      amount = parseInt(totalMatch[1], 10);
+    } else {
+      // Fallback: Saare numbers nikalo aur jo 50 se bada ho, usme se sabse bada wala 'amount' maan lo
+      const numbers = text.match(/\d+/g);
+      if (numbers) {
+        const validNumbers = numbers.map(n => parseInt(n, 10)).filter(n => n > 50);
+        if (validNumbers.length > 0) {
+          amount = Math.max(...validNumbers);
+        }
+      }
+    }
 
+    // 3. SMART Phone Extraction
     const phoneMatch = text.match(/(\d{10})/);
     const phone = phoneMatch ? phoneMatch[1] : '';
 
-    // 3. Database Mein Save Karo (Safe Try-Catch)
+    // 4. SMART Items Extraction (Raw text ko clean karo)
+    let cleanItems = text;
+    cleanItems = cleanItems.replace(/Order:\s*/i, ''); // 'Order:' hatao
+    cleanItems = cleanItems.replace(/(?:total|Total|amount|Amount)\s*:?\s*\d+/i, ''); // 'total: 350' hatao
+    cleanItems = cleanItems.replace(/,\s*\d{10}/, ''); // Phone number hatao
+    cleanItems = cleanItems.replace(/,\s*(Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/i, ''); // City hatao
+    cleanItems = cleanItems.replace(/,\s*$/, '').trim(); // Aakhri comma hatao
+    cleanItems = cleanItems.replace(/^\s*,\s*/, '').trim(); // Shuru ka comma hatao
+    
+    const finalItems = cleanItems.length > 5 ? cleanItems : text;
+
+    console.log('💰 Extracted Amount:', amount, '| 📦 Extracted Items:', finalItems);
+
+    // 5. Database Mein Save Karo
     let orderId = null;
     try {
       const { data, error } = await supabase
@@ -43,9 +67,10 @@ export async function POST(request) {
         .insert({
           customer_name: firstName,
           customer_chat_id: chatId,
-          items: text.replace(/Order:\s*/i, '').trim(),
+          items: finalItems,
           amount: amount,
           phone: phone,
+          address: phoneMatch ? text.match(/(?:Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/i)?.[0] || 'Not provided' : 'Not provided',
           status: 'Pending',
           shop_owner_email: null 
         })
@@ -61,13 +86,13 @@ export async function POST(request) {
       console.error('❌ DB Crash:', dbErr);
     }
 
-    // 4. User Ko Reply Bhejo (Ye hamesha chalega, chahe DB fail ho jaye)
+    // 6. User Ko Clean Reply Bhejo
     if (BOT_TOKEN) {
       const trackingLink = orderId 
         ? `https://quickcart-dashboard-ten.vercel.app/track/${orderId}` 
         : `https://quickcart-dashboard-ten.vercel.app/track`;
 
-      const reply = `✅ *Order Received!*\n\n📦 *Items:*\n${text}\n\n *Total: ₹${amount}*\n *Phone: ${phone || 'Not provided'}*\n\n🔗 *Track:*\n${trackingLink}\n\nShop will contact you soon!`;
+      const reply = `✅ *Order Received!*\n\n📦 *Items:*\n• ${finalItems}\n\n💰 *Total: ₹${amount}*\n📍 *Address: ${phoneMatch ? text.match(/(?:Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/i)?.[0] || 'Not provided' : 'Not provided'}*\n📞 *Phone: ${phone || 'Not provided'}*\n\n🔗 *Track your order:*\n${trackingLink}\n\n💾 Shop will contact you soon!`;
 
       const tgRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
         method: 'POST',
@@ -83,7 +108,7 @@ export async function POST(request) {
         console.error('❌ Telegram API Error:', await tgRes.text());
       }
     } else {
-      console.error('❌ CRITICAL: TELEGRAM_BOT_TOKEN is missing in Vercel Env Variables!');
+      console.error('❌ CRITICAL: TELEGRAM_BOT_TOKEN is missing!');
     }
 
     return NextResponse.json({ success: true });
