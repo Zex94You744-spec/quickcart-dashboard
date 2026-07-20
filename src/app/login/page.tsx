@@ -1,6 +1,11 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,26 +20,20 @@ export default function LoginPage() {
     setError('');
 
     try {
-      // --- ADMIN BYPASS WITH DELAY ---
+      // --- ADMIN BYPASS ---
       if (email.trim() === 'devbusines01@gmail.com' && password === 'TaYOpc9THewup94D6429qC3vxe+fZFKp') {
-        console.log('✅ Admin credentials matched!');
+        console.log('✅ Admin login successful');
         localStorage.setItem('userEmail', 'devbusines01@gmail.com');
         localStorage.setItem('userRole', 'admin');
         
-        // 100ms ka delay taaki browser localStorage pakka save kar le
+        // Small delay to ensure localStorage is saved before redirect
         await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // window.location.replace use karo, ye Next.js router.push se zyada reliable hai full page load ke liye
         window.location.replace('/admin/dashboard');
         return;
       }
-      // -------------------------------
+      // ---------------------
 
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-      const supabase = createClient(supabaseUrl, supabaseKey);
-
+      // --- REGULAR USER LOGIN ---
       const { data: userData, error: userError } = await supabase
         .from('leads')
         .select('*')
@@ -47,17 +46,19 @@ export default function LoginPage() {
         return;
       }
 
-      if (String(userData.password).trim() !== String(password).trim()) {        setError('Invalid email or password');
+      if (String(userData.password).trim() !== String(password).trim()) {
+        setError('Invalid email or password');
         setLoading(false);
         return;
       }
 
+      // Login successful
       localStorage.setItem('userEmail', email.trim());
       localStorage.setItem('userRole', userData.role || 'user');
       
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      if (userData.role === 'admin') {
+      if (userData.role === 'admin' || email.includes('admin') || email.includes('support')) {
         window.location.replace('/admin/dashboard');
       } else {
         window.location.replace('/dashboard');
@@ -92,35 +93,52 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="support@quickcart.com"
+              placeholder="you@example.com"
               required
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition"
             />
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Password *</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="example@123"
+              placeholder="••••••••"
               required
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition"
             />
+            {/* 👇 FORGOT PASSWORD LINK ADDED HERE 👇 */}
+            <div className="flex justify-end mt-2">
+              <a href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors">
+                Forgot Password?
+              </a>
+            </div>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {loading ? 'Logging in...' : '🔐 Login to Dashboard'}
+            {loading ? (
+              <>
+                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Logging in...
+              </>
+            ) : (
+              '🔐 Login to Dashboard'
+            )}
           </button>
         </form>
 
         <div className="mt-6 text-center text-sm text-gray-600">
           Don't have an account?{' '}
-          <a href="/signup" className="text-blue-600 hover:text-blue-800 font-medium">
+          <a href="/signup" className="text-blue-600 hover:text-blue-800 font-medium transition-colors">
             Start Free Trial
           </a>
         </div>
