@@ -21,23 +21,21 @@ export default function ForgotPasswordPage() {
     setError('');
 
     try {
-      const response = await fetch('/api/send-reset-email', {
+      const response = await fetch('/api/request-reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim() })
       });
 
       const result = await response.json();
-
       if (result.success) {
-        setMessage('If an account exists with this email, you will receive password reset instructions shortly.');
-        setEmail(''); // Clear the input
+        setMessage('Check your email! A password reset link has been sent.');
+        setEmail('');
       } else {
-        setError('Something went wrong. Please try again later.');
+        setError('Something went wrong. Please try again.');
       }
     } catch (err) {
-      console.error('Reset error:', err);
-      setError('Something went wrong. Please try again later.');
+      setError('Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
