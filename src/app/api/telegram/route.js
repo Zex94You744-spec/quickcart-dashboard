@@ -6,7 +6,6 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
-// Helper function to send messages
 async function sendTelegramMessage(chatId, text) {
   if (!BOT_TOKEN) return;
   await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -32,24 +31,33 @@ export async function POST(request) {
 
     console.log('📩 New Message:', text);
 
-    // 1. STRICT COMMAND CHECK: Agar '/' se shuru hota hai, toh Help message bhejo aur ruk jao (DB mein save mat karo)
+    // 1. STRICT COMMAND CHECK
     if (lowerText.startsWith('/')) {
       await sendTelegramMessage(chatId, "👋 *Welcome to QuickCart!*\n\nPlease send your order in this format:\n*Order: [items], total: [amount], [city], [phone]*\n\n_Example:_\nOrder: 2kg sugar, 1kg daal, total: 350, Delhi, 9876543210");
       return NextResponse.json({ success: true });
     }
 
-    // 2. GREETINGS / RANDOM CHAT CHECK: In words ko order mat maano
-    const ignoreWords = ['hi', 'hello', 'help', 'me hoon', 'test', 'ok', 'thanks', 'thank you', 'namaste', 'hey'];
-    if (ignoreWords.some(word => lowerText === word || lowerText.includes(word))) {
-      await sendTelegramMessage(chatId, "👋 Hi! Please send your order details like this:\n*Order: 2kg sugar, total: 350, Delhi, 9876543210*");
-      return NextResponse.json({ success: true });
-    }
+    // 2. ORDER DETECTION CHECK (Sabse Important Fix!)
+    // Agar message mein 'total', 'order:', 10 digit phone number, ya 'kg' + number hai, toh ye ORDER hai.
+    const isLikelyOrder = lowerText.includes('total') || 
+                          lowerText.includes('order:') || 
+                          /\d{10}/.test(text) || 
+                          (lowerText.includes('kg') && /\d+/.test(text));
 
-    // 3. BASIC VALIDATION: Agar message bahut chhota hai aur usme koi number nahi hai, toh ye order nahi ho sakta
-    const hasNumber = /\d/.test(text);
-    if (text.length < 10 && !hasNumber) {
-      await sendTelegramMessage(chatId, "⚠️ I didn't understand that. Please send your order like this:\n*Order: 2kg sugar, total: 350, Delhi, 9876543210*");
-      return NextResponse.json({ success: true });
+    if (!isLikelyOrder) {
+      // 3. GREETINGS / RANDOM CHAT CHECK (Sirf tab chalega jab ye order NA ho)
+      const ignoreWords = ['hi', 'hello', 'help', 'me hoon', 'test', 'ok', 'thanks', 'thank you', 'namaste', 'hey'];
+      
+      // Word boundary (\b) use kiya hai taaki "Delhi" mein "hi" match na ho
+      const hasIgnoreWord = ignoreWords.some(word => {
+        const regex = new RegExp(`\\b${word}\\b`, 'i');
+        return regex.test(text);
+      });
+
+      if (hasIgnoreWord || lowerText.length < 5) {
+        await sendTelegramMessage(chatId, "👋 Hi! Please send your order details like this:\n*Order: 2kg sugar, total: 350, Delhi, 9876543210*");
+        return NextResponse.json({ success: true });
+      }
     }
 
     // --- AB SE SIRF VALID ORDERS HI PROCESS HONGE ---
@@ -62,7 +70,7 @@ export async function POST(request) {
     } else {
       const numbers = text.match(/\d+/g);
       if (numbers) {
-        const validNumbers = numbers.map(n => parseInt(n, 10)).filter(n => n >= 50); // Min order value 50 maan rahe hain
+        const validNumbers = numbers.map(n => parseInt(n, 10)).filter(n => n >= 50);
         if (validNumbers.length > 0) {
           amount = Math.max(...validNumbers);
         }
