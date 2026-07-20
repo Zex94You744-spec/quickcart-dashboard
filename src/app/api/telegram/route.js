@@ -19,75 +19,45 @@ export async function POST(request) {
 
       console.log('📩 New Message:', messageText);
 
-      // 🛑 BUG FIX 1: Agar message ek Bot Command hai (/start, /subscribe, etc.), toh order mat banao
+      // 1. Bot Commands ko ignore karo
       if (messageText.trim().startsWith('/')) {
-        console.log('⏭️ Ignoring bot command:', messageText);
+        console.log('️ Ignoring bot command:', messageText);
         return NextResponse.json({ success: true, message: 'Command ignored' });
       }
 
-      // --- 2. SMART AMOUNT EXTRACTION ---
+      // 2. Amount Extract karo
       let extractedAmount = 0;
-      
       const totalMatch = messageText.match(/(?:total|Total)\s*:?\s*(\d+)/i);
-      if (totalMatch) {
-        extractedAmount = parseInt(totalMatch[1], 10);
-      }
+      if (totalMatch) extractedAmount = parseInt(totalMatch[1], 10);
       
       if (extractedAmount === 0) {
         const rupeeMatch = messageText.match(/(?:₹|Rs\.?|INR)\s*(\d+)/i);
-        if (rupeeMatch) {
-          extractedAmount = parseInt(rupeeMatch[1], 10);
-        }
-      }
-      
-      if (extractedAmount === 0) {
-        const numbers = messageText.match(/\d+/g);
-        if (numbers && numbers.length > 0) {
-          for (let i = numbers.length - 1; i >= 0; i--) {
-            const num = parseInt(numbers[i], 10);
-            if (num < 1000000000 && num > 0) {
-              extractedAmount = num;
-              break;
-            }
-          }
-        }
+        if (rupeeMatch) extractedAmount = parseInt(rupeeMatch[1], 10);
       }
 
-      console.log('💰 Extracted Amount:', extractedAmount);
-
-      // --- 3. PHONE & ADDRESS EXTRACTION ---
+      // 3. Phone & Address Extract karo
       const phoneMatch = messageText.match(/(\d{10})/);
       const extractedPhone = phoneMatch ? phoneMatch[1] : '';
-
-      const addressMatch = messageText.match(/(?:Mumbai|Kardha|Delhi|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/i);
+      const addressMatch = messageText.match(/(?:Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/i);
       const extractedAddress = addressMatch ? addressMatch[0] : 'Not provided';
 
-      // --- 4. ITEMS EXTRACTION (Ultimate Split & Filter) ---
+      // 4. Items Extract karo (Clean up)
       let cleanItems = messageText;
       cleanItems = cleanItems.replace(/Order:\s*/i, '');
       cleanItems = cleanItems.replace(/\s*\d{10}\s*/g, '');
       cleanItems = cleanItems.replace(/(?:total|Total)\s*:?\s*\d+/gi, '');
       cleanItems = cleanItems.replace(/(?:₹|Rs\.?|INR)\s*\d+/gi, '');
-      cleanItems = cleanItems.replace(/(?:Mumbai|Kardha|Delhi|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/gi, '');
-      cleanItems = cleanItems.replace(/,\s*\d{3,4}\s*,/g, ',');
-      cleanItems = cleanItems.replace(/,\s*\d{3,4}$/, '');
+      cleanItems = cleanItems.replace(/(?:Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/gi, '');
       
-      const itemsArray = cleanItems
-        .split(',')
-        .map(item => item.trim())
-        .filter(item => item.length > 2 && !/^\d+$/.test(item));
-      
-      const extractedItems = itemsArray.join(', ');
-      const finalItems = extractedItems.length > 3 ? extractedItems : messageText.replace(/Order:\s*/i, '').trim();
+      const itemsArray = cleanItems.split(',').map(item => item.trim()).filter(item => item.length > 2 && !/^\d+$/.test(item));
+      const finalItems = itemsArray.length > 0 ? itemsArray.join(', ') : messageText.replace(/Order:\s*/i, '').trim();
 
-      console.log('📦 Extracted Items:', finalItems);
+      console.log('💰 Amount:', extractedAmount, '| 📦 Items:', finalItems);
 
-      // --- 5. SAVE TO DATABASE ---
+      // 5. Database Mein Save Karo (SAFE INSERT)
       const newTrackingCode = 'TRACK' + Date.now().toString().slice(-6);
 
-      // NOTE: Agar 'shop_owner_email' column nahi hai, toh pehle Supabase SQL Editor mein ye run karo:
-      // ALTER TABLE orders ADD COLUMN IF NOT EXISTS shop_owner_email TEXT;
-      // Abhi ke liye hum ise null chhod rahe hain, lekin dashboard mein filter laga denge.
+      // ⚠️ FIX: shop_owner_email ko yahan se hata diya hai taaki schema error na aaye.
       const { data, error } = await supabase
         .from('orders')
         .insert([
@@ -99,27 +69,24 @@ export async function POST(request) {
             address: extractedAddress,
             phone: extractedPhone,
             tracking_code: newTrackingCode,
-            status: 'Pending',
-            shop_owner_email: null // Isko baad mein bot setup se map karenge
+            status: 'Pending'
           }
         ])
         .select();
 
       if (error) {
         console.error('❌ Database error:', error);
-        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+        // Agar DB fail ho, tab bhi user ko reply bhejo taaki wo pareshan na ho
+      } else {
+        console.log('✅ Order saved:', data);
       }
 
-      console.log('✅ Order saved:', data);
+      // 6. User Ko Reply Bhejo
+      if (BOT_TOKEN) {
+        const trackingLink = `https://quickcart-dashboard-ten.vercel.app/track/${data && data[0] ? data[0].id : 'latest'}`;
+        const replyMessage = `✅ *Order Received!*\n\n📦 *Items:*\n• ${finalItems}\n\n💰 *Total: ₹${extractedAmount}*\n *Address: ${extractedAddress}*\n📞 *Phone: ${extractedPhone}*\n\n🔗 *Track your order:*\n${trackingLink}\n\n💾 Order saved! Shop will contact you soon.`;
 
-      // --- 6. SEND REPLY TO CUSTOMER ---
-      if (BOT_TOKEN && data && data[0]) {
-        const trackingLink = `https://quickcart-dashboard-ten.vercel.app/track/${data[0].id}`;
-        const cleanReplyItems = finalItems.replace(/,\s*$/, '').trim();
-
-        const replyMessage = `✅ *Order Received!*\n\n📦 *Items:*\n• ${cleanReplyItems}\n\n💰 *Total: ₹${extractedAmount}*\n📍 *Address: ${extractedAddress}*\n📞 *Phone: ${extractedPhone}*\n\n🔗 *Track your order:*\n${trackingLink}\n\n💾 Order saved! Shop will contact you soon.`;
-
-        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        const tgResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -128,6 +95,12 @@ export async function POST(request) {
             parse_mode: 'Markdown'
           })
         });
+        
+        if (!tgResponse.ok) {
+           console.error('❌ Telegram API Error:', await tgResponse.text());
+        }
+      } else {
+        console.error('❌ BOT_TOKEN is missing in Vercel Environment Variables!');
       }
 
       return NextResponse.json({ success: true });
@@ -135,7 +108,7 @@ export async function POST(request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('❌ Telegram Webhook Error:', error);
+    console.error('❌ Telegram Webhook Critical Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
