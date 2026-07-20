@@ -21,31 +21,23 @@ export default function ForgotPasswordPage() {
     setError('');
 
     try {
-      // Check karo ki email database mein hai ya nahi
-      const { data, error: fetchError } = await supabase
-        .from('leads')
-        .select('email')
-        .eq('email', email.trim())
-        .single();
+      const response = await fetch('/api/send-reset-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() })
+      });
 
-      if (fetchError || !data) {
-        // Security best practice: Agar email nahi mila, toh bhi same success message dikhao 
-        // taaki hackers ko pata na chale ki kaunsa email registered hai.
+      const result = await response.json();
+
+      if (result.success) {
         setMessage('If an account exists with this email, you will receive password reset instructions shortly.');
-        setLoading(false);
-        return;
+        setEmail(''); // Clear the input
+      } else {
+        setError('Something went wrong. Please try again later.');
       }
-
-      // Yahan hum Supabase ka built-in reset password use kar sakte hain, 
-      // ya phir abhi ke liye ek secure message dikhate hain (MVP ke liye best).
-      setMessage('If an account exists with this email, you will receive password reset instructions shortly.');
-      
-      // Note: Future mein yahan Resend.com ya SendGrid ka API integrate hoga 
-      // jo actual reset link email karega. Abhi ke liye ye secure placeholder hai.
-      
     } catch (err) {
       console.error('Reset error:', err);
-      setMessage('If an account exists with this email, you will receive password reset instructions shortly.');
+      setError('Something went wrong. Please try again later.');
     } finally {
       setLoading(false);
     }
