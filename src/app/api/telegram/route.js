@@ -6,60 +6,89 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
+// Helper function to send messages
+async function sendTelegramMessage(chatId, text) {
+  if (!BOT_TOKEN) return;
+  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: text,
+      parse_mode: 'Markdown'
+    })
+  });
+}
+
 export async function POST(request) {
   try {
     const body = await request.json();
-    
-    if (!body.message) {
-      return NextResponse.json({ success: true });
-    }
+    if (!body.message) return NextResponse.json({ success: true });
 
     const chatId = body.message.chat.id;
     const text = body.message.text || '';
     const firstName = body.message.from.first_name || 'User';
+    const lowerText = text.toLowerCase().trim();
 
     console.log('📩 New Message:', text);
 
-    // 1. Bot Commands ko ignore karo
-    if (text.trim().startsWith('/')) {
-      console.log('⏭️ Ignoring command:', text);
+    // 1. STRICT COMMAND CHECK: Agar '/' se shuru hota hai, toh Help message bhejo aur ruk jao (DB mein save mat karo)
+    if (lowerText.startsWith('/')) {
+      await sendTelegramMessage(chatId, "👋 *Welcome to QuickCart!*\n\nPlease send your order in this format:\n*Order: [items], total: [amount], [city], [phone]*\n\n_Example:_\nOrder: 2kg sugar, 1kg daal, total: 350, Delhi, 9876543210");
       return NextResponse.json({ success: true });
     }
 
-    // 2. SMART Amount Extraction (Pehle 'total' dhundho, warna sabse bada number lo)
+    // 2. GREETINGS / RANDOM CHAT CHECK: In words ko order mat maano
+    const ignoreWords = ['hi', 'hello', 'help', 'me hoon', 'test', 'ok', 'thanks', 'thank you', 'namaste', 'hey'];
+    if (ignoreWords.some(word => lowerText === word || lowerText.includes(word))) {
+      await sendTelegramMessage(chatId, "👋 Hi! Please send your order details like this:\n*Order: 2kg sugar, total: 350, Delhi, 9876543210*");
+      return NextResponse.json({ success: true });
+    }
+
+    // 3. BASIC VALIDATION: Agar message bahut chhota hai aur usme koi number nahi hai, toh ye order nahi ho sakta
+    const hasNumber = /\d/.test(text);
+    if (text.length < 10 && !hasNumber) {
+      await sendTelegramMessage(chatId, "⚠️ I didn't understand that. Please send your order like this:\n*Order: 2kg sugar, total: 350, Delhi, 9876543210*");
+      return NextResponse.json({ success: true });
+    }
+
+    // --- AB SE SIRF VALID ORDERS HI PROCESS HONGE ---
+
+    // 4. SMART Amount Extraction
     let amount = 0;
     const totalMatch = text.match(/(?:total|Total|amount|Amount)\s*:?\s*(\d+)/i);
     if (totalMatch) {
       amount = parseInt(totalMatch[1], 10);
     } else {
-      // Fallback: Saare numbers nikalo aur jo 50 se bada ho, usme se sabse bada wala 'amount' maan lo
       const numbers = text.match(/\d+/g);
       if (numbers) {
-        const validNumbers = numbers.map(n => parseInt(n, 10)).filter(n => n > 50);
+        const validNumbers = numbers.map(n => parseInt(n, 10)).filter(n => n >= 50); // Min order value 50 maan rahe hain
         if (validNumbers.length > 0) {
           amount = Math.max(...validNumbers);
         }
       }
     }
 
-    // 3. SMART Phone Extraction
+    // 5. SMART Phone Extraction
     const phoneMatch = text.match(/(\d{10})/);
     const phone = phoneMatch ? phoneMatch[1] : '';
 
-    // 4. SMART Items Extraction (Raw text ko clean karo)
+    // 6. SMART Items Extraction
     let cleanItems = text;
-    cleanItems = cleanItems.replace(/Order:\s*/i, ''); // 'Order:' hatao
-    cleanItems = cleanItems.replace(/(?:total|Total|amount|Amount)\s*:?\s*\d+/i, ''); // 'total: 350' hatao
-    cleanItems = cleanItems.replace(/,\s*\d{10}/, ''); // Phone number hatao
-    cleanItems = cleanItems.replace(/,\s*(Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/i, ''); // City hatao
-    cleanItems = cleanItems.replace(/,\s*$/, '').trim(); // Aakhri comma hatao
-    cleanItems = cleanItems.replace(/^\s*,\s*/, '').trim(); // Shuru ka comma hatao
+    cleanItems = cleanItems.replace(/Order:\s*/i, '');
+    cleanItems = cleanItems.replace(/(?:total|Total|amount|Amount)\s*:?\s*\d+/i, '');
+    cleanItems = cleanItems.replace(/,\s*\d{10}/, '');
+    cleanItems = cleanItems.replace(/,\s*(Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/i, '');
+    cleanItems = cleanItems.replace(/,\s*$/, '').trim();
+    cleanItems = cleanItems.replace(/^\s*,\s*/, '').trim();
     
     const finalItems = cleanItems.length > 5 ? cleanItems : text;
+    const cityMatch = text.match(/(?:Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/i);
+    const address = cityMatch ? cityMatch[0] : 'Not provided';
 
     console.log('💰 Extracted Amount:', amount, '| 📦 Extracted Items:', finalItems);
 
-    // 5. Database Mein Save Karo
+    // 7. Database Mein Save Karo
     let orderId = null;
     try {
       const { data, error } = await supabase
@@ -70,7 +99,7 @@ export async function POST(request) {
           items: finalItems,
           amount: amount,
           phone: phone,
-          address: phoneMatch ? text.match(/(?:Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/i)?.[0] || 'Not provided' : 'Not provided',
+          address: address,
           status: 'Pending',
           shop_owner_email: null 
         })
@@ -86,13 +115,10 @@ export async function POST(request) {
       console.error('❌ DB Crash:', dbErr);
     }
 
-    // 6. User Ko Clean Reply Bhejo
-    if (BOT_TOKEN) {
-      const trackingLink = orderId 
-        ? `https://quickcart-dashboard-ten.vercel.app/track/${orderId}` 
-        : `https://quickcart-dashboard-ten.vercel.app/track`;
-
-      const reply = `✅ *Order Received!*\n\n📦 *Items:*\n• ${finalItems}\n\n💰 *Total: ₹${amount}*\n📍 *Address: ${phoneMatch ? text.match(/(?:Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/i)?.[0] || 'Not provided' : 'Not provided'}*\n📞 *Phone: ${phone || 'Not provided'}*\n\n🔗 *Track your order:*\n${trackingLink}\n\n💾 Shop will contact you soon!`;
+    // 8. User Ko Clean Success Reply Bhejo
+    if (BOT_TOKEN && orderId) {
+      const trackingLink = `https://quickcart-dashboard-ten.vercel.app/track/${orderId}`;
+      const reply = `✅ *Order Received!*\n\n📦 *Items:*\n• ${finalItems}\n\n💰 *Total: ₹${amount}*\n📍 *Address: ${address}*\n📞 *Phone: ${phone || 'Not provided'}*\n\n🔗 *Track your order:*\n${trackingLink}\n\n💾 Shop will contact you soon!`;
 
       const tgRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
         method: 'POST',
@@ -107,8 +133,6 @@ export async function POST(request) {
       if (!tgRes.ok) {
         console.error('❌ Telegram API Error:', await tgRes.text());
       }
-    } else {
-      console.error('❌ CRITICAL: TELEGRAM_BOT_TOKEN is missing!');
     }
 
     return NextResponse.json({ success: true });
