@@ -7,108 +7,89 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
 export async function POST(request) {
-  console.log('🔔 Telegram webhook hit!');
-  
   try {
     const body = await request.json();
     
-    if (body.message && body.message.text) {
-      const chatId = body.message.chat.id;
-      const messageText = body.message.text;
-      const firstName = body.message.from.first_name || 'Unknown';
-
-      console.log('📩 New Message:', messageText);
-
-      // 1. Bot Commands ko ignore karo
-      if (messageText.trim().startsWith('/')) {
-        console.log('️ Ignoring bot command:', messageText);
-        return NextResponse.json({ success: true, message: 'Command ignored' });
-      }
-
-      // 2. Amount Extract karo
-      let extractedAmount = 0;
-      const totalMatch = messageText.match(/(?:total|Total)\s*:?\s*(\d+)/i);
-      if (totalMatch) extractedAmount = parseInt(totalMatch[1], 10);
-      
-      if (extractedAmount === 0) {
-        const rupeeMatch = messageText.match(/(?:₹|Rs\.?|INR)\s*(\d+)/i);
-        if (rupeeMatch) extractedAmount = parseInt(rupeeMatch[1], 10);
-      }
-
-      // 3. Phone & Address Extract karo
-      const phoneMatch = messageText.match(/(\d{10})/);
-      const extractedPhone = phoneMatch ? phoneMatch[1] : '';
-      const addressMatch = messageText.match(/(?:Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/i);
-      const extractedAddress = addressMatch ? addressMatch[0] : 'Not provided';
-
-      // 4. Items Extract karo (Clean up)
-      let cleanItems = messageText;
-      cleanItems = cleanItems.replace(/Order:\s*/i, '');
-      cleanItems = cleanItems.replace(/\s*\d{10}\s*/g, '');
-      cleanItems = cleanItems.replace(/(?:total|Total)\s*:?\s*\d+/gi, '');
-      cleanItems = cleanItems.replace(/(?:₹|Rs\.?|INR)\s*\d+/gi, '');
-      cleanItems = cleanItems.replace(/(?:Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/gi, '');
-      
-      const itemsArray = cleanItems.split(',').map(item => item.trim()).filter(item => item.length > 2 && !/^\d+$/.test(item));
-      const finalItems = itemsArray.length > 0 ? itemsArray.join(', ') : messageText.replace(/Order:\s*/i, '').trim();
-
-      console.log('💰 Amount:', extractedAmount, '| 📦 Items:', finalItems);
-
-      // 5. Database Mein Save Karo (SAFE INSERT)
-      const newTrackingCode = 'TRACK' + Date.now().toString().slice(-6);
-
-      // ⚠️ FIX: shop_owner_email ko yahan se hata diya hai taaki schema error na aaye.
-      const { data, error } = await supabase
-        .from('orders')
-        .insert([
-          {
-            customer_name: firstName,
-            customer_chat_id: chatId,
-            items: finalItems,
-            amount: extractedAmount,
-            address: extractedAddress,
-            phone: extractedPhone,
-            tracking_code: newTrackingCode,
-            status: 'Pending'
-          }
-        ])
-        .select();
-
-      if (error) {
-        console.error('❌ Database error:', error);
-        // Agar DB fail ho, tab bhi user ko reply bhejo taaki wo pareshan na ho
-      } else {
-        console.log('✅ Order saved:', data);
-      }
-
-      // 6. User Ko Reply Bhejo
-      if (BOT_TOKEN) {
-        const trackingLink = `https://quickcart-dashboard-ten.vercel.app/track/${data && data[0] ? data[0].id : 'latest'}`;
-        const replyMessage = `✅ *Order Received!*\n\n📦 *Items:*\n• ${finalItems}\n\n💰 *Total: ₹${extractedAmount}*\n *Address: ${extractedAddress}*\n📞 *Phone: ${extractedPhone}*\n\n🔗 *Track your order:*\n${trackingLink}\n\n💾 Order saved! Shop will contact you soon.`;
-
-        const tgResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: chatId,
-            text: replyMessage,
-            parse_mode: 'Markdown'
-          })
-        });
-        
-        if (!tgResponse.ok) {
-           console.error('❌ Telegram API Error:', await tgResponse.text());
-        }
-      } else {
-        console.error('❌ BOT_TOKEN is missing in Vercel Environment Variables!');
-      }
-
+    // Agar message nahi hai, toh kuch mat karo
+    if (!body.message) {
       return NextResponse.json({ success: true });
     }
 
+    const chatId = body.message.chat.id;
+    const text = body.message.text || '';
+    const firstName = body.message.from.first_name || 'User';
+
+    console.log(' New Message:', text);
+
+    // 1. Bot Commands (/start, /subscribe) ko ignore karo
+    if (text.trim().startsWith('/')) {
+      console.log('⏭️ Ignoring command:', text);
+      return NextResponse.json({ success: true });
+    }
+
+    // 2. Simple Amount aur Phone Extraction (Jo crash na ho)
+    let amount = 0;
+    const amountMatch = text.match(/(\d+)/);
+    if (amountMatch) amount = parseInt(amountMatch[1]);
+
+    const phoneMatch = text.match(/(\d{10})/);
+    const phone = phoneMatch ? phoneMatch[1] : '';
+
+    // 3. Database Mein Save Karo (Safe Try-Catch)
+    let orderId = null;
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .insert({
+          customer_name: firstName,
+          customer_chat_id: chatId,
+          items: text.replace(/Order:\s*/i, '').trim(),
+          amount: amount,
+          phone: phone,
+          status: 'Pending',
+          shop_owner_email: null 
+        })
+        .select();
+
+      if (error) {
+        console.error('❌ DB Error:', error.message);
+      } else if (data && data[0]) {
+        orderId = data[0].id;
+        console.log('✅ Order saved:', orderId);
+      }
+    } catch (dbErr) {
+      console.error('❌ DB Crash:', dbErr);
+    }
+
+    // 4. User Ko Reply Bhejo (Ye hamesha chalega, chahe DB fail ho jaye)
+    if (BOT_TOKEN) {
+      const trackingLink = orderId 
+        ? `https://quickcart-dashboard-ten.vercel.app/track/${orderId}` 
+        : `https://quickcart-dashboard-ten.vercel.app/track`;
+
+      const reply = `✅ *Order Received!*\n\n📦 *Items:*\n${text}\n\n *Total: ₹${amount}*\n *Phone: ${phone || 'Not provided'}*\n\n🔗 *Track:*\n${trackingLink}\n\nShop will contact you soon!`;
+
+      const tgRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: reply,
+          parse_mode: 'Markdown'
+        })
+      });
+
+      if (!tgRes.ok) {
+        console.error('❌ Telegram API Error:', await tgRes.text());
+      }
+    } else {
+      console.error('❌ CRITICAL: TELEGRAM_BOT_TOKEN is missing in Vercel Env Variables!');
+    }
+
     return NextResponse.json({ success: true });
+
   } catch (error) {
-    console.error('❌ Telegram Webhook Critical Error:', error);
+    console.error('❌ Webhook Critical Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
