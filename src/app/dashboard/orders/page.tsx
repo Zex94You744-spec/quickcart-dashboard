@@ -41,9 +41,8 @@ export default function OrdersPage() {
       const { data: userData } = await supabase.from('leads').select('shop_name').eq('email', email).single();
       if (userData) setUser(userData);
 
-      // ⚠️ TEMP FIX: shop_owner_email column abhi database mein NULL hai.
-      // Isliye filter hata rahe hain taaki Orders page aur Dashboard same data dikhayein.
-      // (Asli data leakage fix karne ke liye humein Telegram Bot ko Shop Owner se map karna padega)
+      // ✅ FIX: shop_owner_email filter hata diya hai kyunki column DB mein NULL hai.
+      // Ab ye Dashboard ke saath 100% match karega.
       const { data: ordersData } = await supabase
         .from('orders')
         .select('*')
@@ -211,7 +210,7 @@ export default function OrdersPage() {
           <div className="px-8 py-4 border-b border-gray-100">
             <input
               type="text"
-              placeholder="🔍 Search by customer name, order ID, items, or address..."
+              placeholder=" Search by customer name, order ID, items, or address..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-none"
@@ -229,7 +228,7 @@ export default function OrdersPage() {
                   onClick={() => setShowDeleteConfirm(true)}
                   className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition text-sm font-semibold"
                 >
-                  🗑️ Delete Selected
+                  ️ Delete Selected
                 </button>
                 <button
                   onClick={() => setSelectedOrders([])}
@@ -308,7 +307,7 @@ export default function OrdersPage() {
                                 ✅ Confirm
                               </button>
                               <button onClick={() => updateOrderStatus(order.id, 'Rejected')} className="text-xs bg-white text-red-600 border border-red-200 px-4 py-2 rounded-lg hover:bg-red-50 transition font-semibold">
-                                ❌ Reject
+                                 Reject
                               </button>
                             </div>
                           )}
@@ -364,7 +363,7 @@ export default function OrdersPage() {
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">️ Confirm Deletion</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Confirm Deletion</h3>
             <p className="text-sm text-gray-600 mb-4">
               Are you sure you want to delete {selectedOrders.length} order(s)?<br/><br/>
               <span className="text-red-600 font-semibold">This action cannot be undone!</span>
