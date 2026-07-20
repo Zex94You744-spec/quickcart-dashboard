@@ -57,22 +57,14 @@ export default function AnalyticsPage() {
       const { data: userData } = await supabase.from('leads').select('shop_name').eq('email', email).single();
       if (userData) setUser(userData);
 
-      // 🛑 BUG FIX 3: Data Leakage Fix - Sirf usi user ke orders fetch karo
-      // Note: Agar 'shop_owner_email' column abhi tak add nahi kiya, toh ye filter hata dena, 
-      // lekin best ye hai ki tum Supabase mein wo column add kar lo.
-      let query = supabase.from('orders').select('*').order('created_at', { ascending: false });
-      
-      // Agar column exist karta hai, toh filter lagao (Fallback: agar error aaye toh catch block handle karega)
-      try {
-        const { data: ordersData } = await query.eq('shop_owner_email', email);
-        if (ordersData) {
-          processOrders(ordersData);
-        }
-      } catch (filterError) {
-        // Agar column nahi hai, toh temporary sab fetch kar lo (lekin ye fix karna zaruri hai)
-        console.warn('shop_owner_email column missing, fetching all orders temporarily');
-        const { data: allOrders } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
-        if (allOrders) processOrders(allOrders);
+      // ✅ FIX: shop_owner_email filter hata diya hai taaki Dashboard, Orders aur Analytics same data dikhayein.
+      const { data: ordersData } = await supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (ordersData) {
+        processOrders(ordersData);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -97,7 +89,7 @@ export default function AnalyticsPage() {
   // Calculate Metrics
   const totalOrders = orders.length;
   
-  // 🛑 BUG FIX 2: Completed Orders mein 'Confirmed', 'Completed', aur 'Delivered' teeno shamil karo
+  // Completed Orders mein 'Confirmed', 'Completed', aur 'Delivered' teeno shamil karo
   const completedOrders = orders.filter(o => 
     o.status === 'Delivered' || 
     o.status === 'Completed' || 
@@ -107,7 +99,6 @@ export default function AnalyticsPage() {
   const pendingOrders = orders.filter(o => o.status === 'Pending').length;
   const totalRevenue = orders.reduce((sum, o) => sum + (Number(o.amount) || 0), 0);
   
-  // Completed Revenue bhi update karo
   const completedRevenue = orders
     .filter(o => 
       o.status === 'Delivered' || 
