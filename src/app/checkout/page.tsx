@@ -37,18 +37,6 @@ const plans = [
   }
 ];
 
-// Razorpay Script Load karne ka helper function
-const loadRazorpayScript = () => {
-  return new Promise((resolve) => {
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-};
-
-// ✅ MAIN COMPONENT JO USESEARCHPARAMS USE KARTA HAI
 function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -57,6 +45,17 @@ function CheckoutContent() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+
+  // Load Razorpay Script on mount
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    document.body.appendChild(script);
+    return () => { 
+      if (document.body.contains(script)) document.body.removeChild(script); 
+    };
+  }, []);
 
   useEffect(() => {
     const email = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
@@ -75,73 +74,86 @@ function CheckoutContent() {
 
   async function handlePayment(plan: any) {
     setProcessing(true);
-    
-    // 1. Razorpay Script Load Karo
-    const res = await loadRazorpayScript();
-    if (!res) {
-      alert("Razorpay SDK failed to load. Please check your internet connection.");
-      setProcessing(false);
-      return;
-    }
-
     try {
-      // 2. Backend se Order ID mango
-      const orderRes = await fetch('/api/create-razorpay-order', {
+      // 1. Backend se Razorpay Order ID generate karo
+      const orderResponse = await fetch('/api/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: plan.price, planName: plan.name })
+        body: JSON.stringify({ amount: plan.price, planId: plan.id })
       });
-      const orderData = await orderRes.json();
+      
+      const orderData = await orderResponse.json();
+      
+      if (!orderData.success) {
+        alert('Failed to initialize payment: ' + orderData.error);
+        setProcessing(false);
+        return;
+      }
 
-      if (!orderData.id) throw new Error("Order creation failed");
-
-      // 3. Razorpay Modal Open Karo
+      // 2. Razorpay Payment Modal Open Karo
       const options: any = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-        amount: orderData.amount,
-        currency: orderData.currency,
+        key: orderData.key,
+        amount: orderData.amount, // Amount in paise
+        currency: "INR",
         name: "QuickCart",
-        description: plan.desc,
-        order_id: orderData.id,
-        prefill: {
-          name: user?.name || "User",
-          email: user?.email || "user@example.com",
-          contact: user?.phone || "9999999999"
-        },
-        theme: { color: "#2563eb" },
+        description: `${plan.name} Plan Subscription`,
+        order_id: orderData.orderId,
         handler: async function (response: any) {
-          // 4. Payment Successful hone ke baad Database Update Karo
-          const upgradeRes = await fetch('/api/upgrade', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              email: user.email, 
-              plan: plan.id,
-              paymentId: response.razorpay_payment_id 
-            })
-          });
-          
-          const upgradeResult = await upgradeRes.json();
-          if (upgradeResult.success) {
-            alert(`🎉 Payment Successful! Welcome to ${plan.name} Plan.`);
-            router.push('/dashboard');
-          } else {
-            alert("Payment done, but activation failed. Please contact support.");
+          // 3. Payment Successful hone par Backend se Verify karo
+          try {
+            const verifyResponse = await fetch('/api/verify-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                email: user.email,
+                plan: plan.id
+              })
+            });
+            
+            const verifyData = await verifyResponse.json();
+            
+            if (verifyData.success) {
+              alert('Payment Successful! Your plan is now active.');
+              router.push('/dashboard');
+            } else {
+              alert('Payment verification failed: ' + verifyData.error);
+            }
+          } catch (err) {
+            alert('Something went wrong during verification.');
+          } finally {
+            setProcessing(false);
           }
+        },
+        prefill: {
+          name: user.name || '',
+          email: user.email || '',
+          contact: user.phone || ''
+        },
+        theme: {
+          color: "#2563eb"
         },
         modal: {
           ondismiss: function() {
-            setProcessing(false);
+            setProcessing(false); // Agar user modal band kar de
           }
         }
       };
 
-      const paymentObject = new (window as any).Razorpay(options);
-      paymentObject.open();
+      // Check if Razorpay SDK is loaded
+      if (typeof window !== 'undefined' && (window as any).Razorpay) {
+        const rzp = new (window as any).Razorpay(options);
+        rzp.open();
+      } else {
+        alert('Razorpay SDK not loaded. Please check your internet connection.');
+        setProcessing(false);
+      }
 
     } catch (error) {
-      console.error("Payment Error:", error);
-      alert("Something went wrong while initiating payment.");
+      console.error("Payment error:", error);
+      alert('Something went wrong. Please try again.');
       setProcessing(false);
     }
   }
@@ -173,12 +185,12 @@ function CheckoutContent() {
                 <span className="text-gray-500">/month</span>
               </div>
               <ul className="space-y-3 mb-8 flex-grow">
-                {plan.features.map((feat: string, i: number) => (
+                {plan.features.map((feat, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
                     <span className="text-green-500 font-bold">✅</span> {feat}
                   </li>
                 ))}
-                {plan.missing.map((feat: string, i: number) => (
+                {plan.missing.map((feat, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-gray-400">
                     <span className="font-bold">❌</span> {feat}
                   </li>
@@ -191,7 +203,7 @@ function CheckoutContent() {
                   plan.popular 
                     ? 'bg-blue-600 text-white hover:bg-blue-700' 
                     : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-                } disabled:opacity-50`}
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {processing ? 'Processing...' : (plan.popular ? 'Proceed to Pay' : 'Choose Plan')}
               </button>
@@ -221,7 +233,6 @@ function CheckoutContent() {
   );
 }
 
-// ✅ PARENT COMPONENT JO SUSPENSE PROVIDE KARTA HAI (YE BUILD ERROR FIX KARTA HAI)
 export default function CheckoutPage() {
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50">Loading checkout...</div>}>
