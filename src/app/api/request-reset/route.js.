@@ -39,10 +39,10 @@ export async function POST(request) {
     const resetLink = `${process.env.NEXT_PUBLIC_APP_URL}/update-password?token=${resetToken}`;
 
     // 5. Resend Se Email Bhejo
-    await resend.emails.send({
-      from: 'onboarding@resend.dev',
-      to: email.trim(),
-      subject: 'QuickCart - Reset Your Password',
+    await resend.emails.send({ from: 'QuickCart 
+      Support <onboarding@resend.dev>', from: 
+      'onboarding@resend.dev', to: email.trim(), 
+      subject: 'QuickCart - Reset Your Password', 
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
           <h2 style="color: #2563eb;">Reset Your Password</h2>
