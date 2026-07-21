@@ -37,10 +37,20 @@ const plans = [
   }
 ];
 
+// Razorpay script load karne ka function
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const leadId = searchParams.get('lead_id');
   
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -63,23 +73,83 @@ function CheckoutContent() {
 
   async function handlePayment(plan: any) {
     setProcessing(true);
-    try {
-      const response = await fetch('/api/upgrade', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: user.email, plan: plan.id })
-      });
-      
-      const result = await response.json();
-      if (result.success) {
-        alert('Payment Successful! Your plan is now active.');
-        router.push('/dashboard');
-      } else {
-        alert('Payment failed: ' + result.error);
+
+    // 1. Razorpay Script Load Karo
+    const isLoaded = await loadRazorpayScript();
+    if (!isLoaded) {
+      alert('Failed to load payment gateway. Please check your internet connection.');
+      setProcessing(false);
+      return;
+    }
+
+    // 2. Razorpay Options Setup Karo
+    const options = {
+      key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_dummy', // Vercel se key aayegi
+      amount: plan.price * 100, // Amount in paise (500 * 100 = 50000 paise)
+      currency: 'INR',
+      name: 'QuickCart',
+      description: `${plan.name} Plan Subscription`,
+      prefill: {
+        name: user?.name || '',
+        email: user?.email || '',
+        contact: user?.phone || ''
+      },
+      theme: {
+        color: '#2563eb'
+      },
+      // 3. Payment Successful Hone Par Ye Chalega
+      handler: async function (response: any) {
+        try {
+          const res = await fetch('/api/upgrade', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              email: user.email, 
+              plan: plan.id,
+              paymentId: response.razorpay_payment_id // Secure tracking ke liye
+            })
+          });
+          
+          const result = await res.json();
+          if (result.success) {
+            alert('🎉 Payment Successful! Your plan is now active.');
+            router.push('/dashboard');
+          } else {
+            alert('Payment verification failed: ' + result.error);
+          }
+        } catch (error) {
+          alert('Something went wrong during verification.');
+        } finally {
+          setProcessing(false);
+        }
+      },
+      modal: {
+        ondismiss: function() {
+          setProcessing(false); // Agar user ne window band kar di
+        }
       }
+    };
+
+    // 4. Razorpay Window Open Karo
+    try {
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
     } catch (error) {
-      alert('Something went wrong.');
-    } finally {
+      console.error('Razorpay error:', error);
+      // Fallback for testing if key is missing
+      const confirmTest = window.confirm("Razorpay Key missing. Simulate successful payment for testing?");
+      if (confirmTest) {
+         const res = await fetch('/api/upgrade', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: user.email, plan: plan.id, paymentId: 'test_pay_123' })
+          });
+          const result = await res.json();
+          if(result.success) {
+             alert('Test Payment Successful!');
+             router.push('/dashboard');
+          }
+      }
       setProcessing(false);
     }
   }
@@ -131,7 +201,7 @@ function CheckoutContent() {
                     : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
                 } disabled:opacity-50`}
               >
-                {plan.popular ? 'Proceed to Pay' : 'Choose Plan'}
+                {processing ? 'Processing...' : (plan.popular ? 'Proceed to Pay' : 'Choose Plan')}
               </button>
             </div>
           ))}
