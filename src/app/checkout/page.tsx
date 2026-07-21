@@ -1,265 +1,153 @@
 'use client';
-
 import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const PLANS = [
+const plans = [
   {
     id: 'starter',
     name: 'Starter',
     price: 499,
-    discountedPrice: 249,
-    description: 'Perfect for small shops and startups',
-    features: [
-      '✅ 50 Orders per month',
-      '✅ Basic Dashboard & Analytics',
-      '✅ Auto PDF Invoices',
-      '✅ Telegram Order Notifications',
-      '❌ CSV Export',
-      '❌ Priority Support'
-    ]
+    desc: 'Perfect for small shops and startups',
+    features: ['50 Orders per month', 'Basic Dashboard & Analytics', 'Auto PDF Invoices', 'Telegram Order Notifications'],
+    missing: ['CSV Export', 'Priority Support'],
+    popular: false
   },
   {
     id: 'pro',
     name: 'Pro',
     price: 999,
-    discountedPrice: 499,
-    description: 'Best value for growing businesses',
-    popular: true,
-    features: [
-      '✅ Unlimited Orders',
-      '✅ Advanced Sales Analytics',
-      '✅ Auto PDF Invoices with GST',
-      '✅ Live Order Tracking Link',
-      '✅ CSV Export for Accounting',
-      '✅ Email & Chat Support'
-    ]
+    desc: 'Best value for growing businesses',
+    features: ['Unlimited Orders', 'Advanced Sales Analytics', 'Auto PDF Invoices with GST', 'Live Order Tracking Link', 'CSV Export for Accounting', 'Email & Chat Support'],
+    missing: [],
+    popular: true
   },
   {
     id: 'premium',
     name: 'Premium',
     price: 1999,
-    discountedPrice: 999,
-    description: 'For large businesses and multi-user teams',
-    features: [
-      '✅ Everything in Pro',
-      '✅ Multi-user Staff Access',
-      '✅ Custom Branding (Your Logo)',
-      '✅ Priority 24/7 Support',
-      '✅ Advanced API Access',
-      '✅ Dedicated Account Manager'
-    ]
+    desc: 'For large businesses and multi-user teams',
+    features: ['Everything in Pro', 'Multi-user Staff Access', 'Custom Branding (Your Logo)', 'Priority 24/7 Support', 'Advanced API Access', 'Dedicated Account Manager'],
+    missing: [],
+    popular: false
   }
 ];
 
 export default function CheckoutPage() {
-  const [leadId, setLeadId] = useState<string | null>(null);
-  const [lead, setLead] = useState<any>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const leadId = searchParams.get('lead_id');
+  
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
 
-  const [selectedPlanId, setSelectedPlanId] = useState<string>('pro');
-
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const id = params.get('lead_id');
-      setLeadId(id);
-      if (id) {
-        fetchLead(id);
-      } else {
-        setLoading(false);
-      }
+    const email = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
+    if (email) {
+      fetchUser(email);
+    } else {
+      router.push('/login');
     }
   }, []);
 
-  async function fetchLead(id: string) {
-    const { data, error } = await supabase
-      .from('leads')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (data) {
-      setLead(data);
-      setSelectedPlanId(data.subscription_plan || 'pro');
-    }
+  async function fetchUser(email: string) {
+    const { data } = await supabase.from('leads').select('*').eq('email', email).single();
+    if (data) setUser(data);
     setLoading(false);
   }
 
-  async function handlePayment(planId: string) {
-    if (!leadId || !lead) return;
+  async function handlePayment(plan: any) {
     setProcessing(true);
-    
     try {
-      // 1. PEHLE DATABASE MEIN STATUS 'ACTIVE' KARO (Upgrade API Call)
-      const upgradeResponse = await fetch('/api/upgrade', {
+      // Yahan Razorpay integration aayegi. Abhi ke liye hum direct upgrade API call kar rahe hain.
+      const response = await fetch('/api/upgrade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: lead.email,
-          plan: planId,
-          paymentId: 'pay_test_' + Date.now()
-        })
+        body: JSON.stringify({ email: user.email, plan: plan.id })
       });
-
-      const upgradeResult = await upgradeResponse.json();
-
-      if (upgradeResult.success) {
-        // 2. Agar upgrade successful hai, toh payment link generate karo
-        const paymentResponse = await fetch('/api/payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ leadId, plan: planId })
-        });
-
-        const paymentResult = await paymentResponse.json();
-
-        if (paymentResult.success && paymentResult.paymentUrl) {
-          window.location.href = paymentResult.paymentUrl;
-        } else {
-          alert('✅ You are now on the Pro Plan! Redirecting to dashboard...');
-          window.location.href = '/dashboard';
-        }
+      
+      const result = await response.json();
+      if (result.success) {
+        alert('Payment Successful! Your plan is now active.');
+        router.push('/dashboard');
       } else {
-        alert('❌ Upgrade failed: ' + (upgradeResult.error || 'Unknown error'));
-        console.error('Upgrade Error Details:', upgradeResult);
-        setProcessing(false);
+        alert('Payment failed: ' + result.error);
       }
     } catch (error) {
-      console.error('Payment/Upgrade error:', error);
-      alert('❌ Failed to process upgrade. Please try again.');
+      alert('Something went wrong.');
+    } finally {
       setProcessing(false);
     }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-xl text-gray-600 animate-pulse">Loading your checkout details...</div>
-      </div>
-    );
-  }
-
-  if (!lead) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-red-600">Invalid Link</h2>
-          <p className="text-gray-600 mt-2">Please contact support or go back to the dashboard.</p>
-          <a href="/dashboard" className="mt-4 inline-block text-blue-600 hover:underline">Go to Dashboard</a>
-        </div>
-      </div>
-    );
-  }
-
-  const isDiscounted = lead.subscription_status === 'discounted';
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  if (!user) return <div className="min-h-screen flex items-center justify-center">User not found.</div>;
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-5xl mx-auto">
-        {/* Header */}
+      <div className="max-w-7xl mx-auto">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Complete Your Subscription</h1>
-          <p className="text-lg text-gray-600">
-            Review your plan details and proceed to secure payment.
-          </p>
-          <div className="mt-4 inline-flex items-center bg-blue-50 px-4 py-2 rounded-full border border-blue-200">
-            <span className="text-blue-800 font-medium">👤 {lead.name}</span>
-            <span className="mx-2 text-blue-300">|</span>
-            <span className="text-blue-800 font-medium">🏪 {lead.shop_name}</span>
+          <h1 className="text-3xl font-bold text-gray-900">Complete Your Subscription</h1>
+          <p className="mt-2 text-gray-600">Review your plan details and proceed to secure payment.</p>
+          <div className="mt-4 flex items-center justify-center gap-2 text-sm text-gray-500">
+            <span>👤 {user.name}</span> | <span>🏪 {user.shop_name}</span>
           </div>
         </div>
 
-        {/* Pricing Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-          {PLANS.map((plan) => {
-            const isSelected = plan.id === selectedPlanId;
-            const displayPrice = isDiscounted ? plan.discountedPrice : plan.price;
-            const originalPrice = isDiscounted ? plan.price : null;
-
-            return (
-              <div
-                key={plan.id}
-                onClick={() => setSelectedPlanId(plan.id)}
-                className={`relative bg-white rounded-2xl shadow-lg border-2 transition-all duration-300 cursor-pointer ${
-                  isSelected ? 'border-blue-600 ring-4 ring-blue-100 scale-105 z-10' : 'border-gray-100 hover:border-gray-300 hover:shadow-xl'
-                }`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-4 py-1 rounded-full text-sm font-bold">
-                    MOST POPULAR
-                  </div>
-                )}
-                {isSelected && isDiscounted && (
-                  <div className="absolute -top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-bold animate-pulse">
-                    🎉 50% OFF APPLIED
-                  </div>
-                )}
-
-                <div className="p-8">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
-                  <p className="text-gray-500 text-sm mb-6">{plan.description}</p>
-
-                  <div className="mb-6">
-                    {originalPrice ? (
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-bold text-gray-900">₹{displayPrice}</span>
-                        <span className="text-lg text-gray-400 line-through">₹{originalPrice}</span>
-                        <span className="text-sm text-gray-500">/month</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-bold text-gray-900">₹{displayPrice}</span>
-                        <span className="text-sm text-gray-500">/month</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <ul className="space-y-3 mb-8">
-                    {plan.features.map((feature, idx) => (
-                      <li key={idx} className="text-sm text-gray-700 flex items-start">
-                        <span className="mr-2">{feature.startsWith('✅') ? '✅' : '❌'}</span>
-                        <span>{feature.substring(2)}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePayment(plan.id);
-                    }}
-                    disabled={processing}
-                    className={`w-full py-3 px-4 rounded-xl font-semibold transition-all ${
-                      isSelected
-                        ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    {processing && isSelected ? 'Processing...' : isSelected ? 'Proceed to Pay' : 'Choose Plan'}
-                  </button>
-                </div>
+          {plans.map((plan) => (
+            <div key={plan.id} className={`bg-white rounded-2xl shadow-sm border ${plan.popular ? 'border-blue-500 ring-2 ring-blue-500' : 'border-gray-200'} p-8 flex flex-col relative`}>
+              {plan.popular && (
+                <span className="absolute top-0 right-0 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-lg">MOST POPULAR</span>
+              )}
+              <h3 className="text-xl font-bold text-gray-900">{plan.name}</h3>
+              <p className="text-sm text-gray-500 mt-2">{plan.desc}</p>
+              <div className="my-6">
+                <span className="text-4xl font-bold text-gray-900">₹{plan.price}</span>
+                <span className="text-gray-500">/month</span>
               </div>
-            );
-          })}
+              <ul className="space-y-3 mb-8 flex-grow">
+                {plan.features.map((feat, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                    <span className="text-green-500 font-bold">✅</span> {feat}
+                  </li>
+                ))}
+                {plan.missing.map((feat, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-gray-400">
+                    <span className="font-bold">❌</span> {feat}
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={() => handlePayment(plan)}
+                disabled={processing}
+                className={`w-full py-3 rounded-lg font-semibold transition ${
+                  plan.popular 
+                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                    : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                } disabled:opacity-50`}
+              >
+                {plan.popular ? 'Proceed to Pay' : 'Choose Plan'}
+              </button>
+            </div>
+          ))}
         </div>
 
-        {/* Trust Badges */}
-        <div className="text-center border-t border-gray-200 pt-8">
-          <p className="text-sm text-gray-500 mb-4">🔒 Secured by Razorpay | 100% Safe & Encrypted</p>
-          <div className="flex justify-center gap-6 text-gray-400 flex-wrap">
+        <div className="text-center space-y-4">
+          <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-500">
+            <span>🔒 Secured by Razorpay | 100% Safe & Encrypted</span>
             <span>💳 UPI / Cards / Net Banking</span>
             <span>📜 GST Invoice Provided</span>
             <span>🔄 Cancel Anytime</span>
           </div>
-
-        {/* 👇 YE BUTTON ADD KARO  */}
-          <div className="mt-6 text-center">
+          
+          {/* 👇 SKIP BUTTON ADDED HERE 👇 */}
+          <div className="pt-4">
             <button 
               onClick={() => router.push('/dashboard')} 
               className="text-sm text-gray-500 hover:text-blue-600 font-medium underline transition"
