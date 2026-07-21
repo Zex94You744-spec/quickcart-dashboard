@@ -12,6 +12,11 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [adminEmail, setAdminEmail] = useState('');
+  
+  // Reset Password Modal States
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [resetLink, setResetLink] = useState('');
+  const [targetUserEmail, setTargetUserEmail] = useState('');
 
   useEffect(() => {
     const email = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
@@ -49,6 +54,37 @@ export default function AdminDashboard() {
     }
   }
 
+  // ✅ STRICT CHECK: Sirf status ke basis par active count karega
+  const isActiveUser = (u: any) => {
+    return u.subscription_status === 'active' || 
+           u.subscription_status === 'paid' || 
+           u.subscription_status === 'premium';
+  };
+
+  // 🔑 Admin Reset Password Function
+  async function handleGenerateResetLink(email: string) {
+    setTargetUserEmail(email);
+    setResetLink('Generating secure link...');
+    setResetModalOpen(true);
+
+    try {
+      const response = await fetch('/api/admin/reset-user-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userEmail: adminEmail, targetEmail: email })
+      });
+      const result = await response.json();
+      
+      if (result.success) {
+        setResetLink(result.resetLink);
+      } else {
+        setResetLink('Error: ' + (result.error || 'Failed to generate link'));
+      }
+    } catch (error) {
+      setResetLink('Failed to connect to server.');
+    }
+  }
+
   function handleLogout() {
     localStorage.removeItem('userEmail');
     localStorage.removeItem('userRole');
@@ -62,13 +98,6 @@ export default function AdminDashboard() {
       </div>
     );
   }
-
-  // ✅ SMART CHECK: Ab ye status aur plan DONO ko check karega (Bilkul User Dashboard ki tarah)
-  const isActiveUser = (u: any) => {
-    return u.subscription_status === 'active' || 
-           u.subscription_status === 'paid' || 
-           u.subscription_status === 'premium';
-  };
 
   const activeCount = users.filter(u => isActiveUser(u)).length;
   const trialCount = users.filter(u => !isActiveUser(u)).length;
@@ -135,6 +164,7 @@ export default function AdminDashboard() {
                     <th className="px-6 py-4">Phone</th>
                     <th className="px-6 py-4">Status</th>
                     <th className="px-6 py-4">Joined</th>
+                    <th className="px-6 py-4">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-sm">
@@ -158,6 +188,14 @@ export default function AdminDashboard() {
                         <td className="px-6 py-4 text-gray-500">
                           {new Date(user.created_at).toLocaleDateString('en-IN')}
                         </td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => handleGenerateResetLink(user.email)}
+                            className="text-xs bg-purple-100 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-lg hover:bg-purple-200 transition font-semibold flex items-center gap-1"
+                          >
+                             Reset Password
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -167,6 +205,41 @@ export default function AdminDashboard() {
           )}
         </div>
       </div>
+
+      {/* Reset Password Modal */}
+      {resetModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl">
+            <h3 className="text-xl font-bold text-gray-900 mb-2"> Password Reset Link</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              User: <span className="font-semibold text-gray-800">{targetUserEmail}</span><br/>
+              ⚠️ This link will expire in <span className="text-red-600 font-bold">5 minutes</span>. Copy and send it to the user immediately.
+            </p>
+            
+            <div className="bg-gray-100 p-3 rounded-lg border border-gray-200 mb-4 break-all text-sm font-mono text-gray-800 max-h-32 overflow-y-auto">
+              {resetLink}
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => { 
+                  navigator.clipboard.writeText(resetLink); 
+                  alert('Link copied to clipboard!'); 
+                }}
+                className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-semibold"
+              >
+                📋 Copy Link
+              </button>
+              <button 
+                onClick={() => setResetModalOpen(false)}
+                className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition font-semibold"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
