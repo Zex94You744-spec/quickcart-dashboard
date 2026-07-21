@@ -8,40 +8,16 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const plans = [
-  {
-    id: 'starter',
-    name: 'Starter',
-    price: 499,
-    desc: 'Perfect for small shops and startups',
-    features: ['50 Orders per month', 'Basic Dashboard & Analytics', 'Auto PDF Invoices', 'Telegram Order Notifications'],
-    missing: ['CSV Export', 'Priority Support'],
-    popular: false
-  },
-  {
-    id: 'pro',
-    name: 'Pro',
-    price: 999,
-    desc: 'Best value for growing businesses',
-    features: ['Unlimited Orders', 'Advanced Sales Analytics', 'Auto PDF Invoices with GST', 'Live Order Tracking Link', 'CSV Export for Accounting', 'Email & Chat Support'],
-    missing: [],
-    popular: true
-  },
-  {
-    id: 'premium',
-    name: 'Premium',
-    price: 1999,
-    desc: 'For large businesses and multi-user teams',
-    features: ['Everything in Pro', 'Multi-user Staff Access', 'Custom Branding (Your Logo)', 'Priority 24/7 Support', 'Advanced API Access', 'Dedicated Account Manager'],
-    missing: [],
-    popular: false
-  }
+  { id: 'starter', name: 'Starter', price: 499, desc: 'Perfect for small shops and startups', features: ['50 Orders per month', 'Basic Dashboard & Analytics', 'Auto PDF Invoices', 'Telegram Order Notifications'], missing: ['CSV Export', 'Priority Support'], popular: false },
+  { id: 'pro', name: 'Pro', price: 999, desc: 'Best value for growing businesses', features: ['Unlimited Orders', 'Advanced Sales Analytics', 'Auto PDF Invoices with GST', 'Live Order Tracking Link', 'CSV Export for Accounting', 'Email & Chat Support'], missing: [], popular: true },
+  { id: 'premium', name: 'Premium', price: 1999, desc: 'For large businesses and multi-user teams', features: ['Everything in Pro', 'Multi-user Staff Access', 'Custom Branding (Your Logo)', 'Priority 24/7 Support', 'Advanced API Access', 'Dedicated Account Manager'], missing: [], popular: false }
 ];
 
-// Razorpay script load karne ka function
+// Razorpay Script Load karne ka function
 const loadRazorpayScript = () => {
   return new Promise((resolve) => {
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.onload = () => resolve(true);
     script.onerror = () => resolve(false);
     document.body.appendChild(script);
@@ -51,18 +27,14 @@ const loadRazorpayScript = () => {
 function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     const email = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
-    if (email) {
-      fetchUser(email);
-    } else {
-      router.push('/login');
-    }
+    if (email) fetchUser(email);
+    else router.push('/login');
   }, []);
 
   async function fetchUser(email: string) {
@@ -73,83 +45,73 @@ function CheckoutContent() {
 
   async function handlePayment(plan: any) {
     setProcessing(true);
-
+    
     // 1. Razorpay Script Load Karo
-    const isLoaded = await loadRazorpayScript();
-    if (!isLoaded) {
-      alert('Failed to load payment gateway. Please check your internet connection.');
+    const res = await loadRazorpayScript();
+    if (!res) {
+      alert("Razorpay SDK failed to load. Please check your internet connection.");
       setProcessing(false);
       return;
     }
 
-    // 2. Razorpay Options Setup Karo
-    const options = {
-      key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_dummy', // Vercel se key aayegi
-      amount: plan.price * 100, // Amount in paise (500 * 100 = 50000 paise)
-      currency: 'INR',
-      name: 'QuickCart',
-      description: `${plan.name} Plan Subscription`,
-      prefill: {
-        name: user?.name || '',
-        email: user?.email || '',
-        contact: user?.phone || ''
-      },
-      theme: {
-        color: '#2563eb'
-      },
-      // 3. Payment Successful Hone Par Ye Chalega
-      handler: async function (response: any) {
-        try {
-          const res = await fetch('/api/upgrade', {
+    try {
+      // 2. Backend se Order ID mango
+      const orderRes = await fetch('/api/create-razorpay-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: plan.price, planName: plan.name })
+      });
+      const orderData = await orderRes.json();
+
+      if (!orderData.id) throw new Error("Order creation failed");
+
+      // 3. Razorpay Modal Open Karo
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: "QuickCart",
+        description: plan.desc,
+        order_id: orderData.id,
+        prefill: {
+          name: user?.name || "User",
+          email: user?.email || "user@example.com",
+          contact: user?.phone || "9999999999"
+        },
+        theme: { color: "#2563eb" },
+        handler: async function (response: any) {
+          // 4. Payment Successful hone ke baad Database Update Karo
+          const upgradeRes = await fetch('/api/upgrade', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
               email: user.email, 
               plan: plan.id,
-              paymentId: response.razorpay_payment_id // Secure tracking ke liye
+              paymentId: response.razorpay_payment_id 
             })
           });
           
-          const result = await res.json();
-          if (result.success) {
-            alert('🎉 Payment Successful! Your plan is now active.');
+          const upgradeResult = await upgradeRes.json();
+          if (upgradeResult.success) {
+            alert(`🎉 Payment Successful! Welcome to ${plan.name} Plan.`);
             router.push('/dashboard');
           } else {
-            alert('Payment verification failed: ' + result.error);
+            alert("Payment done, but activation failed. Please contact support.");
           }
-        } catch (error) {
-          alert('Something went wrong during verification.');
-        } finally {
-          setProcessing(false);
+        },
+        modal: {
+          ondismiss: function() {
+            setProcessing(false);
+          }
         }
-      },
-      modal: {
-        ondismiss: function() {
-          setProcessing(false); // Agar user ne window band kar di
-        }
-      }
-    };
+      };
 
-    // 4. Razorpay Window Open Karo
-    try {
-      const rzp = new (window as any).Razorpay(options);
-      rzp.open();
+      const paymentObject = new (window as any).Razorpay(options);
+      paymentObject.open();
+
     } catch (error) {
-      console.error('Razorpay error:', error);
-      // Fallback for testing if key is missing
-      const confirmTest = window.confirm("Razorpay Key missing. Simulate successful payment for testing?");
-      if (confirmTest) {
-         const res = await fetch('/api/upgrade', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: user.email, plan: plan.id, paymentId: 'test_pay_123' })
-          });
-          const result = await res.json();
-          if(result.success) {
-             alert('Test Payment Successful!');
-             router.push('/dashboard');
-          }
-      }
+      console.error("Payment Error:", error);
+      alert("Something went wrong while initiating payment.");
       setProcessing(false);
     }
   }
@@ -171,9 +133,7 @@ function CheckoutContent() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
           {plans.map((plan) => (
             <div key={plan.id} className={`bg-white rounded-2xl shadow-sm border ${plan.popular ? 'border-blue-500 ring-2 ring-blue-500' : 'border-gray-200'} p-8 flex flex-col relative`}>
-              {plan.popular && (
-                <span className="absolute top-0 right-0 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-lg">MOST POPULAR</span>
-              )}
+              {plan.popular && <span className="absolute top-0 right-0 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-lg">MOST POPULAR</span>}
               <h3 className="text-xl font-bold text-gray-900">{plan.name}</h3>
               <p className="text-sm text-gray-500 mt-2">{plan.desc}</p>
               <div className="my-6">
@@ -181,25 +141,13 @@ function CheckoutContent() {
                 <span className="text-gray-500">/month</span>
               </div>
               <ul className="space-y-3 mb-8 flex-grow">
-                {plan.features.map((feat, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
-                    <span className="text-green-500 font-bold">✅</span> {feat}
-                  </li>
-                ))}
-                {plan.missing.map((feat, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-gray-400">
-                    <span className="font-bold">❌</span> {feat}
-                  </li>
-                ))}
+                {plan.features.map((feat, i) => <li key={i} className="flex items-start gap-2 text-sm text-gray-700"><span className="text-green-500 font-bold">✅</span> {feat}</li>)}
+                {plan.missing.map((feat, i) => <li key={i} className="flex items-start gap-2 text-sm text-gray-400"><span className="font-bold">❌</span> {feat}</li>)}
               </ul>
               <button
                 onClick={() => handlePayment(plan)}
                 disabled={processing}
-                className={`w-full py-3 rounded-lg font-semibold transition ${
-                  plan.popular 
-                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                    : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-                } disabled:opacity-50`}
+                className={`w-full py-3 rounded-lg font-semibold transition ${plan.popular ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-900 hover:bg-gray-200'} disabled:opacity-50`}
               >
                 {processing ? 'Processing...' : (plan.popular ? 'Proceed to Pay' : 'Choose Plan')}
               </button>
@@ -214,12 +162,8 @@ function CheckoutContent() {
             <span>📜 GST Invoice Provided</span>
             <span>🔄 Cancel Anytime</span>
           </div>
-          
           <div className="pt-4">
-            <button 
-              onClick={() => router.push('/dashboard')} 
-              className="text-sm text-gray-500 hover:text-blue-600 font-medium underline transition"
-            >
+            <button onClick={() => router.push('/dashboard')} className="text-sm text-gray-500 hover:text-blue-600 font-medium underline transition">
               Skip for now & Go to Dashboard →
             </button>
           </div>
