@@ -37,6 +37,27 @@ export async function POST(request) {
       return NextResponse.json({ success: true });
     }
 
+    // 1. URL se Bot Token nikalo (e.g., /api/telegram?token=123:ABC)
+    const { searchParams } = new URL(request.url);
+    const incomingBotToken = searchParams.get('token');
+    let targetShopEmail = null;
+
+    // 2. Database mein check karo ki ye token kis user ka hai
+    if (incomingBotToken) {
+      const { data: shopOwner } = await supabase
+        .from('leads')
+        .select('email')
+        .eq('bot_token', incomingBotToken)
+        .single();
+      
+      if (shopOwner) {
+        targetShopEmail = shopOwner.email;
+        console.log('✅ Order routed to shop:', targetShopEmail);
+      } else {
+        console.log('⚠️ Bot token not found in database.');
+      }
+    }
+
     // 2. ORDER DETECTION CHECK (Sabse Important Fix!)
     // Agar message mein 'total', 'order:', 10 digit phone number, ya 'kg' + number hai, toh ye ORDER hai.
     const isLikelyOrder = lowerText.includes('total') || 

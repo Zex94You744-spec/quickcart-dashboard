@@ -257,6 +257,16 @@ export default function CheckoutPage() {
             <span>📜 GST Invoice Provided</span>
             <span>🔄 Cancel Anytime</span>
           </div>
+
+        {/* 👇 YE BUTTON ADD KARO  */}
+          <div className="mt-6 text-center">
+            <button 
+              onClick={() => router.push('/dashboard')} 
+              className="text-sm text-gray-500 hover:text-blue-600 font-medium underline transition"
+            >
+              Skip for now & Go to Dashboard →
+            </button>
+          </div>
         </div>
       </div>
     </div>
