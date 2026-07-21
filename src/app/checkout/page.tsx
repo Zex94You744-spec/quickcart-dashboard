@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 
@@ -37,7 +37,7 @@ const plans = [
   }
 ];
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const leadId = searchParams.get('lead_id');
@@ -64,7 +64,6 @@ export default function CheckoutPage() {
   async function handlePayment(plan: any) {
     setProcessing(true);
     try {
-      // Yahan Razorpay integration aayegi. Abhi ke liye hum direct upgrade API call kar rahe hain.
       const response = await fetch('/api/upgrade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -146,7 +145,6 @@ export default function CheckoutPage() {
             <span>🔄 Cancel Anytime</span>
           </div>
           
-          {/* 👇 SKIP BUTTON ADDED HERE 👇 */}
           <div className="pt-4">
             <button 
               onClick={() => router.push('/dashboard')} 
@@ -158,5 +156,13 @@ export default function CheckoutPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50">Loading checkout...</div>}>
+      <CheckoutContent />
+    </Suspense>
   );
 }
