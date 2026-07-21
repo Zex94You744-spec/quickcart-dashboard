@@ -8,12 +8,36 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const plans = [
-  { id: 'starter', name: 'Starter', price: 499, desc: 'Perfect for small shops and startups', features: ['50 Orders per month', 'Basic Dashboard & Analytics', 'Auto PDF Invoices', 'Telegram Order Notifications'], missing: ['CSV Export', 'Priority Support'], popular: false },
-  { id: 'pro', name: 'Pro', price: 999, desc: 'Best value for growing businesses', features: ['Unlimited Orders', 'Advanced Sales Analytics', 'Auto PDF Invoices with GST', 'Live Order Tracking Link', 'CSV Export for Accounting', 'Email & Chat Support'], missing: [], popular: true },
-  { id: 'premium', name: 'Premium', price: 1999, desc: 'For large businesses and multi-user teams', features: ['Everything in Pro', 'Multi-user Staff Access', 'Custom Branding (Your Logo)', 'Priority 24/7 Support', 'Advanced API Access', 'Dedicated Account Manager'], missing: [], popular: false }
+  {
+    id: 'starter',
+    name: 'Starter',
+    price: 499,
+    desc: 'Perfect for small shops and startups',
+    features: ['50 Orders per month', 'Basic Dashboard & Analytics', 'Auto PDF Invoices', 'Telegram Order Notifications'],
+    missing: ['CSV Export', 'Priority Support'],
+    popular: false
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    price: 999,
+    desc: 'Best value for growing businesses',
+    features: ['Unlimited Orders', 'Advanced Sales Analytics', 'Auto PDF Invoices with GST', 'Live Order Tracking Link', 'CSV Export for Accounting', 'Email & Chat Support'],
+    missing: [],
+    popular: true
+  },
+  {
+    id: 'premium',
+    name: 'Premium',
+    price: 1999,
+    desc: 'For large businesses and multi-user teams',
+    features: ['Everything in Pro', 'Multi-user Staff Access', 'Custom Branding (Your Logo)', 'Priority 24/7 Support', 'Advanced API Access', 'Dedicated Account Manager'],
+    missing: [],
+    popular: false
+  }
 ];
 
-// Razorpay Script Load karne ka function
+// Razorpay Script Load karne ka helper function
 const loadRazorpayScript = () => {
   return new Promise((resolve) => {
     const script = document.createElement("script");
@@ -24,17 +48,23 @@ const loadRazorpayScript = () => {
   });
 };
 
+// ✅ MAIN COMPONENT JO USESEARCHPARAMS USE KARTA HAI
 function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const leadId = searchParams.get('lead_id');
+  
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     const email = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
-    if (email) fetchUser(email);
-    else router.push('/login');
+    if (email) {
+      fetchUser(email);
+    } else {
+      router.push('/login');
+    }
   }, []);
 
   async function fetchUser(email: string) {
@@ -66,7 +96,7 @@ function CheckoutContent() {
       if (!orderData.id) throw new Error("Order creation failed");
 
       // 3. Razorpay Modal Open Karo
-      const options = {
+      const options: any = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
         amount: orderData.amount,
         currency: orderData.currency,
@@ -133,7 +163,9 @@ function CheckoutContent() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
           {plans.map((plan) => (
             <div key={plan.id} className={`bg-white rounded-2xl shadow-sm border ${plan.popular ? 'border-blue-500 ring-2 ring-blue-500' : 'border-gray-200'} p-8 flex flex-col relative`}>
-              {plan.popular && <span className="absolute top-0 right-0 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-lg">MOST POPULAR</span>}
+              {plan.popular && (
+                <span className="absolute top-0 right-0 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-lg">MOST POPULAR</span>
+              )}
               <h3 className="text-xl font-bold text-gray-900">{plan.name}</h3>
               <p className="text-sm text-gray-500 mt-2">{plan.desc}</p>
               <div className="my-6">
@@ -141,13 +173,25 @@ function CheckoutContent() {
                 <span className="text-gray-500">/month</span>
               </div>
               <ul className="space-y-3 mb-8 flex-grow">
-                {plan.features.map((feat, i) => <li key={i} className="flex items-start gap-2 text-sm text-gray-700"><span className="text-green-500 font-bold">✅</span> {feat}</li>)}
-                {plan.missing.map((feat, i) => <li key={i} className="flex items-start gap-2 text-sm text-gray-400"><span className="font-bold">❌</span> {feat}</li>)}
+                {plan.features.map((feat: string, i: number) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                    <span className="text-green-500 font-bold">✅</span> {feat}
+                  </li>
+                ))}
+                {plan.missing.map((feat: string, i: number) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-gray-400">
+                    <span className="font-bold">❌</span> {feat}
+                  </li>
+                ))}
               </ul>
               <button
                 onClick={() => handlePayment(plan)}
                 disabled={processing}
-                className={`w-full py-3 rounded-lg font-semibold transition ${plan.popular ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-900 hover:bg-gray-200'} disabled:opacity-50`}
+                className={`w-full py-3 rounded-lg font-semibold transition ${
+                  plan.popular 
+                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                    : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                } disabled:opacity-50`}
               >
                 {processing ? 'Processing...' : (plan.popular ? 'Proceed to Pay' : 'Choose Plan')}
               </button>
@@ -162,8 +206,12 @@ function CheckoutContent() {
             <span>📜 GST Invoice Provided</span>
             <span>🔄 Cancel Anytime</span>
           </div>
+          
           <div className="pt-4">
-            <button onClick={() => router.push('/dashboard')} className="text-sm text-gray-500 hover:text-blue-600 font-medium underline transition">
+            <button 
+              onClick={() => router.push('/dashboard')} 
+              className="text-sm text-gray-500 hover:text-blue-600 font-medium underline transition"
+            >
               Skip for now & Go to Dashboard →
             </button>
           </div>
@@ -173,6 +221,7 @@ function CheckoutContent() {
   );
 }
 
+// ✅ PARENT COMPONENT JO SUSPENSE PROVIDE KARTA HAI (YE BUILD ERROR FIX KARTA HAI)
 export default function CheckoutPage() {
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50">Loading checkout...</div>}>
