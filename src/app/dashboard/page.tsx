@@ -92,7 +92,7 @@ export default function UserDashboard() {
     }
     return days.map(date => {
       const dayOrders = orders.filter(o => o.created_at && o.created_at.startsWith(date) && (o.status === 'Completed' || o.status === 'Delivered' || o.status === 'Confirmed'));
-      const revenue = dayOrders.reduce((sum, o) => sum + (Number(order.amount) || 0), 0);
+      const revenue = dayOrders.reduce((sum, o) => sum + (Number(o.amount) || 0), 0);
       return { date: date.slice(5), revenue };
     });
   };
