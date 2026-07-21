@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 
@@ -37,7 +37,7 @@ const plans = [
   }
 ];
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const leadId = searchParams.get('lead_id');
@@ -45,16 +45,21 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    // ✅ SAFE: window check ke sath localStorage access
     const email = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
+    
     if (email && leadId) {
       supabase.from('leads').select('*').eq('id', leadId).single().then(({ data }) => {
-        if (data) setUser(data);
-        else router.push('/login');
+        if (data) {
+          setUser(data);
+        } else {
+          router.push('/login');
+        }
       });
-    } else {
+    } else if (!email) {
       router.push('/login');
     }
-  }, [leadId]);
+  }, [leadId, router]);
 
   async function handlePayment(planId: string, amount: number) {
     if (!user) return;
@@ -66,6 +71,7 @@ export default function CheckoutPage() {
         body: JSON.stringify({ leadId: user.id, amount, plan: planId, email: user.email })
       });
       const data = await res.json();
+      
       if (data.success) {
         const options = {
           key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
@@ -86,19 +92,28 @@ export default function CheckoutPage() {
           prefill: { name: user.name, email: user.email, contact: user.phone },
           theme: { color: "#2563eb" }
         };
-        const rzp = new (window as any).Razorpay(options);
-        rzp.open();
+        
+        // ✅ SAFE: window check ke sath Razorpay load
+        if (typeof window !== 'undefined' && (window as any).Razorpay) {
+          const rzp = new (window as any).Razorpay(options);
+          rzp.open();
+        } else {
+          alert('Razorpay SDK not loaded. Please check your internet connection.');
+        }
       } else {
         alert('Failed to create order: ' + data.error);
       }
     } catch (error) {
+      console.error('Payment error:', error);
       alert('Payment failed. Please try again.');
     } finally {
       setLoading(false);
     }
   }
 
-  if (!user) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  if (!user) {
+    return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-600">Loading checkout details...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -136,9 +151,9 @@ export default function CheckoutPage() {
               <button
                 onClick={() => handlePayment(plan.id, plan.price)}
                 disabled={loading}
-                className={`w-full py-3 rounded-xl font-bold transition ${plan.popular ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'} disabled:opacity-50`}
+                className={`w-full py-3 rounded-xl font-bold transition ${plan.popular ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'} disabled:opacity-50 disabled:cursor-not-allowed`}
               >
-                {plan.popular ? 'Proceed to Pay' : 'Choose Plan'}
+                {loading ? 'Processing...' : (plan.popular ? 'Proceed to Pay' : 'Choose Plan')}
               </button>
             </div>
           ))}
@@ -152,7 +167,7 @@ export default function CheckoutPage() {
             <span>🔄 Cancel Anytime</span>
           </div>
           
-          {/* 👇 SKIP BUTTON ADDED HERE 👇 */}
+          {/* 👇 SKIP BUTTON 👇 */}
           <div className="pt-4 border-t border-gray-200 max-w-md mx-auto">
             <button 
               onClick={() => router.push('/dashboard')} 
@@ -164,5 +179,14 @@ export default function CheckoutPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// ✅ MAIN EXPORT WITH SUSPENSE (Ye build error ko 100% fix karega)
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-600">Loading checkout...</div>}>
+      <CheckoutContent />
+    </Suspense>
   );
 }
