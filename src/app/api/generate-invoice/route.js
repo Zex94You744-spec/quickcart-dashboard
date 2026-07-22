@@ -5,41 +5,49 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const GLOBAL_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
 export async function POST(request) {
   try {
-    const { orderId, chatId } = await request.json();
+    const { orderId, chatId, botToken: providedBotToken } = await request.json();
 
-    // Fetch order
-    const { data: order, error } = await supabase
+    // 1. Fetch Order Details
+    const { data: order, error: orderError } = await supabase
       .from('orders')
       .select('*')
       .eq('id', orderId)
       .single();
 
-    if (error || !order) {
+    if (orderError || !order) {
       return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
     }
 
-    // Check subscription plan - Starter mein PDF mat bhej
-const { data: shopData } = await supabase
-  .from('leads')
-  .select('subscription_plan')
-  .eq('email', shopOwnerEmail)
-  .single();
+    // 2. Fetch Shop Owner Data (Plan check aur Bot Token ke liye)
+    const { data: shopData, error: shopError } = await supabase
+      .from('leads')
+      .select('subscription_plan, bot_token')
+      .eq('email', order.shop_owner_email)
+      .single();
 
-const isProOrPremium = shopData?.subscription_plan === 'pro' || shopData?.subscription_plan === 'premium';
+    if (shopError || !shopData) {
+      return NextResponse.json({ success: false, error: 'Shop data not found' }, { status: 404 });
+    }
 
-if (!isProOrPremium) {
-  console.log('📄 Starter plan - PDF invoice skipped');
-  return NextResponse.json({ 
-    success: false, 
-    error: 'PDF invoices available in Pro plan only. Please upgrade.' 
-  });
-}
+    // 3. ✅ PLAN CHECK: Starter plan mein PDF mat bhejo
+    const isProOrPremium = shopData.subscription_plan === 'pro' || shopData.subscription_plan === 'premium';
 
-    // Create PDF
+    if (!isProOrPremium) {
+      console.log('📄 Starter plan detected - PDF invoice skipped');
+      return NextResponse.json({
+        success: false,
+        error: 'PDF invoices are available in Pro plan only. Please upgrade.'
+      });
+    }
+
+    // 4. Use Shop's Bot Token (Fallback to provided or global if needed)
+    const finalBotToken = shopData.bot_token || providedBotToken || GLOBAL_BOT_TOKEN;
+
+    // 5. Create PDF
     const pdfDoc = await PDFDocument.create();
     const page = pdfDoc.addPage([595, 842]);
     const { width, height } = page.getSize();
@@ -49,8 +57,8 @@ if (!isProOrPremium) {
 
     // Header (Blue)
     page.drawRectangle({ x: 0, y: height - 100, width: width, height: 100, color: rgb(0.23, 0.51, 0.96) });
-    page.drawText('INVOICE', { x: width / 2 - 60, y: height - 60, size: 32, font: boldFont, color: rgb(1, 1, 1) });   
-    
+    page.drawText('INVOICE', { x: width / 2 - 60, y: height - 60, size: 32, font: boldFont, color: rgb(1, 1, 1) });
+
     // Shop Info
     page.drawText('QuickCart Store', { x: 50, y: height - 140, size: 16, font: boldFont, color: rgb(0.12, 0.16, 0.24) });
     page.drawText('Order ID: #' + String(order.id).slice(0, 8).toUpperCase(), { x: 50, y: height - 165, size: 11, font: font, color: rgb(0.3, 0.35, 0.4) });
@@ -64,7 +72,8 @@ if (!isProOrPremium) {
 
     // Table Header
     const tableY = height - 330;
-    page.drawRectangle({ x: 50, y: tableY, width: 495, height: 30, color: rgb(0.23, 0.51, 0.96) });    page.drawText('#', { x: 60, y: tableY + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
+    page.drawRectangle({ x: 50, y: tableY, width: 495, height: 30, color: rgb(0.23, 0.51, 0.96) });
+    page.drawText('#', { x: 60, y: tableY + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
     page.drawText('Item', { x: 100, y: tableY + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
     page.drawText('Price', { x: 320, y: tableY + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
     page.drawText('GST%', { x: 400, y: tableY + 10, size: 11, font: boldFont, color: rgb(1, 1, 1) });
@@ -76,7 +85,7 @@ if (!isProOrPremium) {
       const rawItems = String(order.items).split(',').map(i => i.trim()).filter(i => i.length > 0);
       const subtotal = Number(order.amount) || 0;
       const pricePerItem = rawItems.length > 0 ? Math.round(subtotal / rawItems.length) : subtotal;
-      
+
       itemsArray = rawItems.map(name => ({
         name: name,
         price: pricePerItem,
@@ -114,7 +123,7 @@ if (!isProOrPremium) {
     // Totals
     currentY -= 15;
     page.drawLine({ start: { x: 50, y: currentY }, end: { x: 545, y: currentY }, thickness: 1, color: rgb(0.8, 0.8, 0.8) });
-    currentY -= 25;    
+    currentY -= 25;
     page.drawText('Subtotal:', { x: 350, y: currentY, size: 11, font: font, color: rgb(0.3, 0.35, 0.4) });
     page.drawText('Rs.' + calcSubtotal, { x: 470, y: currentY, size: 11, font: font, color: rgb(0.3, 0.35, 0.4) });
 
@@ -130,18 +139,18 @@ if (!isProOrPremium) {
     page.drawText('Thank you for shopping with us!', { x: width / 2 - 100, y: 60, size: 10, font: font, color: rgb(0.42, 0.45, 0.5) });
     page.drawText('QuickCart - Digitizing Your Business', { x: width / 2 - 110, y: 40, size: 10, font: boldFont, color: rgb(0.12, 0.16, 0.24) });
 
-    // Save and send
+    // 6. Save and Send PDF via Shop's Bot
     const pdfBytes = await pdfDoc.save();
     const blob = new Blob([pdfBytes], { type: 'application/pdf' });
 
-    if (BOT_TOKEN && chatId) {
+    if (finalBotToken && chatId) {
       const formData = new FormData();
       formData.append('chat_id', chatId);
       formData.append('document', blob, `Invoice_${String(order.id).slice(0, 8).toUpperCase()}.pdf`);
       formData.append('caption', `🧾 Invoice for Order #${String(order.id).slice(0, 8).toUpperCase()}\n\n*Grand Total: Rs.${calcSubtotal + calcGST}*`);
       formData.append('parse_mode', 'Markdown');
 
-      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
+      await fetch(`https://api.telegram.org/bot${finalBotToken}/sendDocument`, {
         method: 'POST',
         body: formData
       });

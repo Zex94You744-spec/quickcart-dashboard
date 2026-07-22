@@ -42,27 +42,84 @@ export default function OrdersPage() {
   }
 
   async function updateOrderStatus(orderId: string, newStatus: string, time?: string) {
-    const { data: orderData } = await supabase.from('orders').select('customer_chat_id, tracking_code, amount').eq('id', orderId).single();
-    const updateData: any = { status: newStatus };
-    if (time) updateData.delivery_time = time;
+  // Order details fetch karo
+  const { data: orderData } = await supabase
+    .from('orders')
+    .select('customer_chat_id, tracking_code, amount, shop_owner_email')
+    .eq('id', orderId)
+    .single();
 
-    const { error } = await supabase.from('orders').update(updateData).eq('id', orderId);
-    if (!error) {
-      if (newStatus === 'Confirmed' && orderData?.customer_chat_id) {
-        try { await fetch('/api/generate-invoice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId, chatId: orderData.customer_chat_id }) }); } catch (err) { console.error('PDF generation failed:', err); }
+  // Shop owner ka bot token fetch karo
+  const { data: shopData } = await supabase
+    .from('leads')
+    .select('bot_token')
+    .eq('email', orderData?.shop_owner_email)
+    .single();
+
+  const shopBotToken = shopData?.bot_token;
+
+  const updateData: any = { status: newStatus };
+  if (time) updateData.delivery_time = time;
+
+  const { error } = await supabase
+    .from('orders')
+    .update(updateData)
+    .eq('id', orderId);
+
+  if (!error) {
+    // Invoice generate (Pro/Premium ke liye)
+    if (newStatus === 'Confirmed' && orderData?.customer_chat_id) {
+      try {
+        await fetch('/api/generate-invoice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            orderId, 
+            chatId: orderData.customer_chat_id,
+            botToken: shopBotToken // Shop ka token bhejo
+          })
+        });
+      } catch (err) {
+        console.error('PDF generation failed:', err);
       }
-      if (orderData?.customer_chat_id) {
-        let message = '';
-        if (newStatus === 'Confirmed') message = `✅ *Order Confirmed!*\n\nEstimated delivery: ${time || 'Today'}\n\nTrack live: https://quickcart-dashboard-ten.vercel.app/track/${orderId}`;
-        else if (newStatus === 'Out for Delivery') message = `🚴 *Your order is out for delivery!*\n\nTrack live: https://quickcart-dashboard-ten.vercel.app/track/${orderId}`;
-        else if (newStatus === 'Delivered') message = `✅ *Order Delivered!*\n\nThank you for shopping with us! 🙏`;
-        else if (newStatus === 'Rejected') message = `❌ Maafi chahte hain, lekin aapka order reject kar diya gaya hai.`;
-        try { await fetch('/api/send-telegram', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chatId: orderData.customer_chat_id, message }) }); } catch (err) { console.error('Telegram send failed:', err); }
-      }
-      fetchData(userEmail);
-      alert(`Order ${newStatus}! Customer notified.`);
     }
+
+    // Telegram message bhejo (Shop ke bot se!)
+    if (orderData?.customer_chat_id && shopBotToken) {
+      let message = '';
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://quickcart-dashboard-ten.vercel.app';
+      const trackLink = `${appUrl}/track/${orderId}`;
+
+      if (newStatus === 'Confirmed') {
+        message = `✅ *Order Confirmed!*\n\nEstimated delivery: ${time || 'Today'}\n\nTrack live: ${trackLink}`;
+      } else if (newStatus === 'Out for Delivery') {
+        message = `🚴 *Your order is out for delivery!*\n\nTrack live: ${trackLink}`;
+      } else if (newStatus === 'Delivered') {
+        message = `✅ *Order Delivered!*\n\nThank you for shopping with us! 🙏`;
+      } else if (newStatus === 'Rejected') {
+        message = `❌ Maafi chahte hain, lekin aapka order reject kar diya gaya hai.`;
+      }
+
+      // Shop ke bot se message bhejo
+      try {
+        await fetch('/api/send-telegram-message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            botToken: shopBotToken,
+            chatId: orderData.customer_chat_id,
+            message: message
+          })
+        });
+      } catch (err) {
+        console.error('Telegram send failed:', err);
+      }
+    }
+
+    fetchData(userEmail);
+    alert(`Order ${newStatus}! Customer notified.`);
   }
+}
 
   function handleConfirmClick(orderId: string) { setSelectedOrderId(orderId); setShowDeliveryModal(true); }
   function submitDeliveryTime() { if (selectedOrderId && deliveryTime) { updateOrderStatus(selectedOrderId, 'Confirmed', deliveryTime); setShowDeliveryModal(false); setDeliveryTime(''); } }
