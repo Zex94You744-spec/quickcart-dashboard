@@ -1,124 +1,269 @@
+'use client';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 export default function BotSetupPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [botToken, setBotToken] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState('');
+
+  useEffect(() => {
+    const email = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
+    if (email) {
+      fetchUserData(email);
+    } else {
+      router.push('/login');
+    }
+  }, []);
+
+  async function fetchUserData(email: string) {
+    try {
+      const { data: userData } = await supabase.from('leads').select('*').eq('email', email).single();
+      if (userData) {
+        setUser(userData);
+        if (userData.bot_token) {
+          setBotToken(userData.bot_token);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSaveToken() {
+    if (!botToken.trim()) {
+      setError('Please enter your bot token');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    setMessage('');
+
+    try {
+      // Database mein token save karo
+      const { error: updateError } = await supabase
+        .from('leads')
+        .update({ bot_token: botToken.trim() })
+        .eq('email', user.email);
+
+      if (updateError) throw updateError;
+
+      // Webhook set karo
+      const webhookResponse = await fetch('/api/setup-webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ botToken: botToken.trim() })
+      });
+
+      const webhookResult = await webhookResponse.json();
+
+      if (webhookResult.success) {
+        setMessage('✅ Bot connected successfully! Webhook is now active.');
+      } else {
+        setMessage('⚠️ Token saved, but webhook setup failed. Please try again.');
+      }
+    } catch (error: any) {
+      setError('Failed to save token: ' + error.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleTestConnection() {
+    if (!botToken.trim()) {
+      setError('Please save your bot token first');
+      return;
+    }
+
+    setTesting(true);
+    setTestResult('');
+
+    try {
+      const response = await fetch('/api/test-bot-connection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ botToken: botToken.trim() })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setTestResult(`✅ Connection successful! Bot name: ${result.botName}`);
+      } else {
+        setTestResult(`❌ Connection failed: ${result.error}`);
+      }
+    } catch (error: any) {
+      setTestResult('❌ Test failed: ' + error.message);
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center bg-gray-50">Loading...</div>;
+  }
+
+  if (!user) {
+    return <div className="min-h-screen flex items-center justify-center bg-gray-50">User not found</div>;
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
-        
+      <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Telegram Bot Setup Guide</h1>
-          <p className="text-lg text-gray-600">
-            Set up your QuickCart bot in just 5 minutes. No coding required!
-          </p>
+        <div className="mb-8">
+          <button 
+            onClick={() => router.push('/dashboard')} 
+            className="text-blue-600 hover:text-blue-800 font-medium mb-4 flex items-center gap-2"
+          >
+            ← Back to Dashboard
+          </button>
+          <h1 className="text-3xl font-bold text-gray-900">🤖 Bot Setup Guide</h1>
+          <p className="text-gray-600 mt-2">Connect your Telegram bot to receive orders automatically.</p>
         </div>
 
-        {/* Steps Container */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-8">
+        {/* Step-by-Step Guide */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-8">
+          <h2 className="text-xl font-bold text-gray-900 mb-6">📋 How to Create Your Telegram Bot</h2>
           
-          {/* Step 1 */}
-          <div className="mb-8">
-            <div className="flex items-center mb-3">
-              <span className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3">1</span>
-              <h2 className="text-xl font-bold text-gray-900">Open BotFather</h2>
+          <div className="space-y-6">
+            <div className="flex gap-4">
+              <div className="flex-shrink-0 w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">1</div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">Open Telegram and Search for BotFather</h3>
+                <p className="text-gray-600 text-sm">
+                  In Telegram, search for <code className="bg-gray-100 px-2 py-1 rounded">@BotFather</code> and start a chat.
+                </p>
+              </div>
             </div>
-            <p className="text-gray-600 ml-11 mb-3">
-              Open the Telegram app and search for <code className="bg-gray-100 px-2 py-1 rounded text-blue-600 font-mono">@BotFather</code> in the search bar.
-            </p>
-            <p className="text-gray-600 ml-11">
-              Click on the official BotFather account (with the blue tick) and tap the <strong>Start</strong> button.
-            </p>
+
+            <div className="flex gap-4">
+              <div className="flex-shrink-0 w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">2</div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">Create a New Bot</h3>
+                <p className="text-gray-600 text-sm">
+                  Send the command <code className="bg-gray-100 px-2 py-1 rounded">/newbot</code> to BotFather.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex-shrink-0 w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">3</div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">Choose a Name for Your Bot</h3>
+                <p className="text-gray-600 text-sm">
+                  BotFather will ask for a name (e.g., "My Shop Bot"). Choose any name you like.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex-shrink-0 w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">4</div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">Choose a Username for Your Bot</h3>
+                <p className="text-gray-600 text-sm">
+                  BotFather will ask for a username (must end with "bot", e.g., "myshop_bot").
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex-shrink-0 w-10 h-10 bg-green-100 text-green-600 rounded-full flex items-center justify-center font-bold">5</div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">Copy Your Bot Token</h3>
+                <p className="text-gray-600 text-sm">
+                  BotFather will give you a token like: <code className="bg-gray-100 px-2 py-1 rounded text-xs">123456789:ABCdefGHIjklMNOpqrsTUVwxyz</code>
+                  <br/>
+                  <span className="text-red-600 font-semibold">⚠️ Keep this token secret! Never share it with anyone.</span>
+                </p>
+              </div>
+            </div>
           </div>
+        </div>
 
-          <hr className="border-gray-100 my-6" />
+        {/* Token Input Section */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-8">
+          <h2 className="text-xl font-bold text-gray-900 mb-6">🔑 Enter Your Bot Token</h2>
 
-          {/* Step 2 */}
-          <div className="mb-8">
-            <div className="flex items-center mb-3">
-              <span className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3">2</span>
-              <h2 className="text-xl font-bold text-gray-900">Create a New Bot</h2>
+          {message && (
+            <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
+              {message}
             </div>
-            <p className="text-gray-600 ml-11 mb-3">
-              Type and send the following command in the chat box:
-            </p>
-            <div className="ml-11 bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-lg inline-block">
-              /newbot
+          )}
+
+          {error && (
+            <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              {error}
             </div>
-          </div>
+          )}
 
-          <hr className="border-gray-100 my-6" />
-
-          {/* Step 3 */}
-          <div className="mb-8">            <div className="flex items-center mb-3">
-              <span className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3">3</span>
-              <h2 className="text-xl font-bold text-gray-900">Name Your Bot</h2>
-            </div>
-            <p className="text-gray-600 ml-11">
-              BotFather will ask for a name for your bot. You can give it any name, for example: <br/>
-              <code className="bg-gray-100 px-2 py-1 rounded text-gray-800 font-mono">Rahul General Store Bot</code>
-            </p>
-          </div>
-
-          <hr className="border-gray-100 my-6" />
-
-          {/* Step 4 */}
-          <div className="mb-8">
-            <div className="flex items-center mb-3">
-              <span className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3">4</span>
-              <h2 className="text-xl font-bold text-gray-900">Set a Username</h2>
-            </div>
-            <p className="text-gray-600 ml-11 mb-3">
-              Now, you need a unique username. Please note, the username must end with <strong>'bot'</strong>. <br/>
-              Example: <code className="bg-gray-100 px-2 py-1 rounded text-gray-800 font-mono">rahul_store_quickbot</code>
-            </p>
-          </div>
-
-          <hr className="border-gray-100 my-6" />
-
-          {/* Step 5 */}
-          <div className="mb-4">
-            <div className="flex items-center mb-3">
-              <span className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3">5</span>
-              <h2 className="text-xl font-bold text-gray-900">Copy Your API Token</h2>
-            </div>
-            <p className="text-gray-600 ml-11 mb-3">
-              BotFather will send you a long message. Inside it, you will find an <strong>HTTP API Token</strong> that looks something like this:
-            </p>
-            <div className="ml-11 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-              <p className="font-mono text-sm text-gray-800 break-all">
-                123456789:ABCdefGhIjKlMnOpQrStUvWxYz123456789
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Bot Token
+              </label>
+              <input
+                type="text"
+                value={botToken}
+                onChange={(e) => setBotToken(e.target.value)}
+                placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none font-mono text-sm"
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                Paste the token you received from BotFather
               </p>
             </div>
-            <p className="text-gray-600 ml-11 mt-3 font-semibold text-blue-700">
-              👉 Please copy this token!
-            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleSaveToken}
+                disabled={saving}
+                className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? 'Saving...' : '💾 Save & Connect Bot'}
+              </button>
+              
+              <button
+                onClick={handleTestConnection}
+                disabled={testing || !botToken.trim()}
+                className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {testing ? 'Testing...' : '🧪 Test Connection'}
+              </button>
+            </div>
+
+            {testResult && (
+              <div className={`mt-4 p-4 rounded-lg text-sm ${testResult.startsWith('✅') ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                {testResult}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Support / Help Section */}
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 border border-blue-100 text-center">
-          <div className="text-4xl mb-4"></div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Stuck Somewhere?</h2>          <p className="text-gray-600 mb-6 max-w-lg mx-auto">
-            No worries! Our team is ready to help you. Just send your Bot Token to our support email, and we will set up the bot for you.
-          </p>
-          
-          <a 
-            href="mailto:supportquickcart0gmail.com?subject=Need%20Help%20with%20Bot%20Setup&body=Hi%20QuickCart%20Team,%0A%0AI%20am%20stuck%20setting%20up%20my%20bot.%20Here%20is%20my%20Bot%20Token:%0A%0A%5BPASTE%20YOUR%20TOKEN%20HERE%5D%0A%0AMy%20Shop%20Name:%20%0AMy%20Phone%20Number:%20"
-            className="inline-flex items-center justify-center bg-blue-600 text-white px-8 py-3 rounded-xl font-semibold hover:bg-blue-700 transition shadow-lg hover:shadow-xl"
-          >
-             Email Support Team
-          </a>
-          
-          <p className="text-sm text-gray-500 mt-4">
-            We reply within 24 hours.
-          </p>
+        {/* Webhook Information */}
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
+          <h3 className="font-bold text-blue-900 mb-2">ℹ️ How It Works</h3>
+          <ul className="text-sm text-blue-800 space-y-2">
+            <li>• When you save your bot token, we automatically set up a webhook with Telegram</li>
+            <li>• All orders sent to your bot will be automatically routed to your dashboard</li>
+            <li>• You can test the connection anytime using the "Test Connection" button</li>
+            <li>• Your bot token is encrypted and stored securely</li>
+          </ul>
         </div>
-
-        {/* Back Button */}
-        <div className="text-center mt-8">
-          <a href="/landing" className="text-blue-600 hover:text-blue-800 font-medium">
-            ← Back to Home
-          </a>
-        </div>
-
       </div>
     </div>
   );
