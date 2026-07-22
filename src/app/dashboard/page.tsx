@@ -22,7 +22,7 @@ export default function UserDashboard() {
     const role = typeof window !== 'undefined' ? localStorage.getItem('userRole') : null;
     
     if (email) {
-      if (role === 'admin' || email === 'devbusines01@gmail.com' || email === 'support@quickcart.com') {
+      if (role === 'admin' || email === 'admin@quickcart.com' || email === 'support@quickcart.com') {
         window.location.replace('/admin/dashboard');
         return;
       }
@@ -92,6 +92,7 @@ export default function UserDashboard() {
     }
     return days.map(date => {
       const dayOrders = orders.filter(o => o.created_at && o.created_at.startsWith(date) && (o.status === 'Completed' || o.status === 'Delivered' || o.status === 'Confirmed'));
+      // ✅ FIXED TYPO: o.amount instead of order.amount
       const revenue = dayOrders.reduce((sum, o) => sum + (Number(o.amount) || 0), 0);
       return { date: date.slice(5), revenue };
     });
@@ -122,7 +123,7 @@ export default function UserDashboard() {
             <p className="text-gray-500 mt-1">Here is an overview of your store performance today.</p>
           </div>
           {!isPaid && (
-            <a href={`/checkout?lead_id=${user.id}`} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition shadow-md shadow-blue-200 flex items-center gap-2 whitespace-nowrap"> Complete Payment Now</a>
+            <a href={`/checkout?lead_id=${user.id}`} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition shadow-md shadow-blue-200 flex items-center gap-2 whitespace-nowrap">💳 Complete Payment Now</a>
           )}
         </div>
 
@@ -131,7 +132,7 @@ export default function UserDashboard() {
             { label: 'Total Orders', value: totalOrders, color: 'text-gray-900', icon: '📦' },
             { label: 'Total Revenue', value: `₹${totalRevenue}`, color: 'text-green-600', icon: '💰' },
             { label: 'Pending Orders', value: pendingOrders, color: 'text-orange-600', icon: '⏳' },
-            { label: 'Bot Status', value: isPaid ? 'Connected' : 'Inactive', color: isPaid ? 'text-green-600' : 'text-gray-400', icon: '' }
+            { label: 'Bot Status', value: isPaid ? 'Connected' : 'Inactive', color: isPaid ? 'text-green-600' : 'text-gray-400', icon: '🤖' }
           ].map((stat, idx) => (
             <div key={idx} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300">
               <div className="flex items-center justify-between mb-4">
@@ -171,7 +172,7 @@ export default function UserDashboard() {
             <div><h3 className="font-bold text-gray-900 text-lg">Manage Orders</h3><p className="text-sm text-gray-500">View, confirm or reject all orders</p></div>
           </a>
           <a href="/analytics" className="bg-white p-6 rounded-2xl border border-gray-100 hover:border-indigo-300 hover:shadow-lg transition-all duration-300 flex items-center gap-4 group">
-            <div className="w-14 h-14 bg-indigo-50 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform duration-300">📊</div>
+            <div className="w-14 h-14 bg-indigo-50 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform duration-300"></div>
             <div><h3 className="font-bold text-gray-900 text-lg">View Analytics</h3><p className="text-sm text-gray-500">Detailed sales charts and insights</p></div>
           </a>
           <a href="/bot-setup" className="bg-white p-6 rounded-2xl border border-gray-100 hover:border-gray-300 hover:shadow-lg transition-all duration-300 flex items-center gap-4 group">
@@ -180,7 +181,7 @@ export default function UserDashboard() {
           </a>
         </div>
 
-        {/* Account & Billing Settings Section */}
+        {/* 👇 ACCOUNT & BILLING SETTINGS SECTION (YE ADD HUA HAI) 👇 */}
         <div className="mt-8">
           <h2 className="text-xl font-bold text-gray-900 mb-4">Account & Billing Settings</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
