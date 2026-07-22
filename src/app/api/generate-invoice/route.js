@@ -22,6 +22,23 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
     }
 
+    // Check subscription plan - Starter mein PDF mat bhej
+const { data: shopData } = await supabase
+  .from('leads')
+  .select('subscription_plan')
+  .eq('email', shopOwnerEmail)
+  .single();
+
+const isProOrPremium = shopData?.subscription_plan === 'pro' || shopData?.subscription_plan === 'premium';
+
+if (!isProOrPremium) {
+  console.log('📄 Starter plan - PDF invoice skipped');
+  return NextResponse.json({ 
+    success: false, 
+    error: 'PDF invoices available in Pro plan only. Please upgrade.' 
+  });
+}
+
     // Create PDF
     const pdfDoc = await PDFDocument.create();
     const page = pdfDoc.addPage([595, 842]);
