@@ -7,7 +7,6 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function sendTelegramMessage(botToken, chatId, text, parseMode = 'Markdown') {
   if (!botToken) return false;
-  
   try {
     const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: 'POST',
@@ -40,7 +39,7 @@ export async function POST(request) {
     if (incomingBotToken) {
       const { data: shopOwner } = await supabase
         .from('leads')
-        .select('email, bot_token, subscription_plan')
+        .select('email, bot_token')
         .eq('bot_token', incomingBotToken)
         .single();
       
@@ -48,6 +47,48 @@ export async function POST(request) {
         targetShopEmail = shopOwner.email;
         shopBotToken = shopOwner.bot_token || incomingBotToken;
       }
+    }
+
+    // ✅ HANDLE YES/NO REPLY FOR PRICE CONFIRMATION
+    if (lowerText === 'yes' || lowerText === 'no' || lowerText === 'y' || lowerText === 'n') {
+      // Check karo ki koi pending price confirmation order hai
+      const { data: pendingOrders } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('customer_chat_id', chatId)
+        .eq('status', 'Pending Price Confirmation')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (pendingOrders && pendingOrders.length > 0) {
+        const order = pendingOrders[0];
+        
+        if (lowerText === 'yes' || lowerText === 'y') {
+          // Customer ne price confirm kar di!
+          await supabase
+            .from('orders')
+            .update({ 
+              status: 'Pending',
+              price_confirmed: true
+            })
+            .eq('id', order.id);
+
+          await sendTelegramMessage(shopBotToken, chatId, 
+            `✅ *Thank You!*\n\nYour order has been confirmed.\n\n*Order ID:* #${String(order.id).slice(0, 8).toUpperCase()}\n*Final Amount:* ₹${order.amount}\n\nShop will process your order shortly.`
+          );
+        } else {
+          // Customer ne price reject kar di
+          await supabase
+            .from('orders')
+            .update({ status: 'Rejected' })
+            .eq('id', order.id);
+
+          await sendTelegramMessage(shopBotToken, chatId, 
+            `❌ Order cancelled. Please contact the shop for more details.`
+          );
+        }
+      }
+      return NextResponse.json({ success: true });
     }
 
     // Commands
@@ -69,9 +110,9 @@ export async function POST(request) {
     }
 
     // Extract data
-    let amount = 0;
+    let customerAmount = 0;
     const totalMatch = text.match(/(?:total|Total)\s*:?\s*(\d+)/i);
-    if (totalMatch) amount = parseInt(totalMatch[1], 10);
+    if (totalMatch) customerAmount = parseInt(totalMatch[1], 10);
 
     const phoneMatch = text.match(/(\d{10})/);
     const phone = phoneMatch ? phoneMatch[1] : '';
@@ -93,7 +134,7 @@ export async function POST(request) {
       .from('orders')
       .select('id')
       .eq('customer_chat_id', chatId)
-      .eq('amount', amount)
+      .eq('amount', customerAmount)
       .eq('items', cleanItems)
       .gte('created_at', fiveMinutesAgo.toISOString())
       .single();
@@ -103,7 +144,7 @@ export async function POST(request) {
       return NextResponse.json({ success: true, message: 'Duplicate' });
     }
 
-    // Save order
+    // Save order with PENDING PRICE CONFIRMATION status
     let orderId = null;
     const { data, error } = await supabase
       .from('orders')
@@ -111,10 +152,12 @@ export async function POST(request) {
         customer_name: firstName,
         customer_chat_id: chatId,
         items: cleanItems,
-        amount: amount,
+        amount: customerAmount, // Customer ka proposed price
+        customer_proposed_amount: customerAmount,
         phone: phone,
         address: address,
-        status: 'Pending',
+        status: 'Pending Price Confirmation', // Naya status!
+        price_confirmed: false,
         shop_owner_email: targetShopEmail
       })
       .select();
@@ -123,14 +166,11 @@ export async function POST(request) {
       orderId = data[0].id;
     }
 
-    // Reply to customer
+    // Reply to customer - Price confirmation pending
     if (orderId) {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://quickcart-dashboard-ten.vercel.app';
-      const trackingLink = `${appUrl}/track/${orderId}`;
-      
-      const reply = `✅ *Order Received!*\n\n📦 *Items:*\n• ${cleanItems}\n\n💰 *Total: ₹${amount}*\n📍 *Address: ${address}*\n *Phone: ${phone}*\n\n *Track:*\n${trackingLink}\n\n💾 Shop will contact you soon!`;
-
-      await sendTelegramMessage(shopBotToken, chatId, reply);
+      await sendTelegramMessage(shopBotToken, chatId, 
+        `✅ *Order Received!*\n\n *Items:*\n• ${cleanItems}\n\n💰 *Proposed Total:* ₹${customerAmount}\n📍 *Address:* ${address}\n📞 *Phone:* ${phone}\n\n⏳ *The shop will confirm the final price shortly.*\n\n*You will receive a message to confirm the price.*`
+      );
     }
 
     return NextResponse.json({ success: true });
