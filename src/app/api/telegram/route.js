@@ -110,7 +110,7 @@ export async function POST(request) {
 
     let itemsArray = cleanItems.split(',').map(i => i.trim()).filter(i => i.length > 0);
 
-    // ✅ 6. AUTO CALCULATE TOTAL (Unicode Friendly)
+    // ✅ 6. AUTO CALCULATE TOTAL (With Debug Logs)
     let calculatedTotal = 0;
     let replyItems = "";
 
@@ -120,34 +120,39 @@ export async function POST(request) {
       .eq('shop_owner_email', targetShopEmail);
 
     if (products && products.length > 0) {
+      console.log('🔍 DEBUG: Products in DB:', products.map(p => p.name));
+      
       for (let item of itemsArray) {
-        // ✅ UPDATED REGEX: Ab ye Odia, Hindi, aur kisi bhi bhasha ke characters ko pakad lega
+        // Regex jo numbers, unit, aur baaki text (Odia/Hindi/English) ko pakde
         const match = item.match(/(\d+)\s*(kg|g|l|ml)?\s*(.+)/i);
         
         if (match) {
           const qty = parseInt(match[1]);
           const unit = match[2] || 'kg';
-          const itemName = match[3].toLowerCase().trim(); // Odia/Hindi text yahan aayega
+          const itemName = match[3].toLowerCase().trim(); 
           
-          // ✅ SMART MATCHING: Database ke name mein item ho, ya item mein database ka name ho
-          const product = products.find(p => 
-            p.name.toLowerCase().includes(itemName) || 
-            itemName.includes(p.name.toLowerCase())
-          );
+          console.log(`🔍 DEBUG: Checking customer item: "${itemName}"`);
+
+          // Super flexible matching: DB name mein customer text ho, YA customer text mein DB name ho
+          const product = products.find(p => {
+            const dbName = p.name.toLowerCase().trim();
+            return dbName.includes(itemName) || itemName.includes(dbName);
+          });
           
           if (product) {
             const itemTotal = qty * product.price;
             calculatedTotal += itemTotal;
             replyItems += `• ${qty}${unit} ${product.name} (₹${itemTotal})\n`;
           } else {
+            console.log(`⚠️ DEBUG: NO MATCH found for "${itemName}" in DB`);
             replyItems += `• ${item} (Price TBD)\n`;
           }
         } else {
-          // Agar format match nahi hua, toh use as-is chhod do
           replyItems += `• ${item}\n`;
         }
       }
     } else {
+      console.log('⚠️ DEBUG: No products found in DB for this shop!');
       replyItems = itemsArray.map(i => `• ${i}`).join('\n');
       const totalMatch = text.match(/(?:total|Total)\s*:?\s*(\d+)/i);
       if (totalMatch) calculatedTotal = parseInt(totalMatch[1], 10);
