@@ -46,16 +46,12 @@ export default function OrdersPage() {
   }
 
   async function handleUpdateStatus(orderId: string, newStatus: string, rejectionReason?: string) {
-  // ✅ 1. UPDATED STATUS UPDATE FUNCTION
-  async function handleUpdateStatus(orderId: string, newStatus: string, rejectionReason?: string) {
-    // Fetch order data
     const { data: orderData } = await supabase
       .from('orders')
       .select('customer_chat_id, shop_owner_email')
       .eq('id', orderId)
       .single();
     
-    // ✅ CRITICAL FIX: 'phone' ko bhi select karo taaki WhatsApp link ban sake
     const { data: shopData } = await supabase
       .from('leads')
       .select('bot_token, phone')
@@ -64,7 +60,6 @@ export default function OrdersPage() {
     
     const shopBotToken = shopData?.bot_token;
 
-    // Update data with optional rejection reason
     const updateData: any = { status: newStatus };
     if (rejectionReason) updateData.rejection_reason = rejectionReason;
 
@@ -93,9 +88,8 @@ export default function OrdersPage() {
         } else if (newStatus === 'Delivered') {
           message = `✅ *Order Delivered!*\n\nThank you for shopping with us! 🙏`;
         } else if (newStatus === 'Rejected') {
-          // ✅ UPDATED REJECTION MESSAGE WITH PHONE & WHATSAPP LINK
           const shopPhone = shopData?.phone || 'Not available';
-          const cleanPhone = shopPhone.replace(/\D/g, ''); // Sirf numbers rakho
+          const cleanPhone = shopPhone.replace(/\D/g, '');
           const whatsappLink = cleanPhone ? `https://wa.me/91${cleanPhone}` : '#';
           
           message = `❌ *Maafi chahte hain, aapka order reject kar diya gaya hai.*\n\n*Reason:* ${rejectionReason || 'Not specified'}\n\n📞 *Contact Shop:* ${shopPhone}\n📱 *WhatsApp:* [Click Here to Chat](${whatsappLink})\n\nPlease contact the shop for more details.`;
@@ -115,13 +109,12 @@ export default function OrdersPage() {
     }
   }
 
-  // ✅ 2. DEDICATED REJECT HANDLER WITH PROMPT
   async function handleRejectClick(orderId: string) {
     const reason = prompt("⚠️ Please enter the reason for rejection:\n(e.g., Out of stock, Delivery area not covered, Shop closed)");
     
     if (!reason || reason.trim() === "") {
       alert("Rejection reason is required to inform the customer.");
-      return; // Cancel rejection if no reason provided
+      return;
     }
 
     if (confirm(`Are you sure you want to reject this order?\n\nReason: "${reason}"`)) {
