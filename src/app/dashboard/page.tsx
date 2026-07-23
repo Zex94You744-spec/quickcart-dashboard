@@ -183,6 +183,10 @@ export default function UserDashboard() {
             <div className="w-14 h-14 bg-gray-50 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform duration-300">⚙️</div>
             <div><h3 className="font-bold text-gray-900 text-lg">Bot Setup Guide</h3><p className="text-sm text-gray-500">Connect your Telegram bot</p></div>
           </a>
+          <a href="/dashboard/settings" className="bg-white p-6 rounded-2xl border border-gray-100 hover:border-purple-300 hover:shadow-lg transition-all duration-300 flex items-center gap-4 group">
+            <div className="w-14 h-14 bg-purple-50 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform duration-300">⚙️</div>
+            <div><h3 className="font-bold text-gray-900 text-lg">Shop Settings</h3><p className="text-sm text-gray-500">Language & preferences</p></div>
+          </a>
         </div>
 
         {/* 👇 ACCOUNT & BILLING SETTINGS SECTION (YE ADD HUA HAI) 👇 */}
