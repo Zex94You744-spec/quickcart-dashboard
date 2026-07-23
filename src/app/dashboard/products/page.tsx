@@ -59,7 +59,7 @@ export default function ProductsPage() {
       fetchProducts(userEmail);
       alert('Product added successfully!');
     } else {
-      alert('Failed to add product');
+      alert('Failed to add product: ' + error.message);
     }
     setSaving(false);
   }
