@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getTranslation } from '../../../lib/translations';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -35,24 +36,30 @@ export async function POST(request) {
     
     let targetShopEmail = null;
     let shopBotToken = incomingBotToken;
+    let shopLanguage = 'hindi'; // Default language
 
+    // 1. Fetch Shop Owner & Language
     if (incomingBotToken) {
       const { data: shopOwner } = await supabase
         .from('leads')
-        .select('email, bot_token')
+        .select('email, bot_token, preferred_language')
         .eq('bot_token', incomingBotToken)
         .single();
       
       if (shopOwner) {
         targetShopEmail = shopOwner.email;
         shopBotToken = shopOwner.bot_token || incomingBotToken;
+        shopLanguage = shopOwner.preferred_language || 'hindi';
       }
     }
 
-    // ✅ 1. HANDLE /MENU OR /PRICE COMMAND
+    // Load Translations
+    const t = getTranslation(shopLanguage);
+
+    // 2. HANDLE /MENU OR /PRICE COMMAND
     if (lowerText === '/menu' || lowerText === '/price' || lowerText === 'menu') {
       if (!targetShopEmail) {
-        await sendTelegramMessage(shopBotToken, chatId, "⚠️ Shop not found. Please contact support.");
+        await sendTelegramMessage(shopBotToken, chatId, t.shopNotFound);
         return NextResponse.json({ success: true });
       }
 
@@ -63,48 +70,47 @@ export async function POST(request) {
         .order('created_at', { ascending: true });
 
       if (products && products.length > 0) {
-        let menuText = `🏪 *Our Price List*\n\n`;
+        let menuText = `${t.menuTitle}\n\n`;
         products.forEach(p => {
           menuText += `• ${p.name} (${p.unit}): ₹${p.price}\n`;
         });
-        menuText += `\n📝 *How to order:*\nOrder: 2kg pyaaz, 1kg aalu, Delhi, 9876543210`;
+        menuText += `\n${t.howToOrder}\n${t.orderFormat}`;
         await sendTelegramMessage(shopBotToken, chatId, menuText);
       } else {
-        await sendTelegramMessage(shopBotToken, chatId, "📭 Price list is currently empty. Please try again later.");
+        await sendTelegramMessage(shopBotToken, chatId, t.priceListEmpty);
       }
       return NextResponse.json({ success: true });
     }
 
-    // Commands
+    // 3. OTHER COMMANDS
     if (lowerText.startsWith('/')) {
-      await sendTelegramMessage(shopBotToken, chatId, `*Welcome!* Send /menu to see prices.\n\n*Order format:*\nOrder: 2kg pyaaz, Delhi, 9876543210`);
+      await sendTelegramMessage(shopBotToken, chatId, `${t.welcomeMessage}\n${t.orderFormat}`);
       return NextResponse.json({ success: true });
     }
 
-    // Order detection
+    // 4. ORDER DETECTION
     const isLikelyOrder = lowerText.includes('order:') || /\d{10}/.test(text);
 
     if (!isLikelyOrder) {
-      await sendTelegramMessage(shopBotToken, chatId, `👋 Please send /menu to see prices or send order like:\n*Order: 2kg pyaaz, Delhi, 9876543210*`);
+      await sendTelegramMessage(shopBotToken, chatId, `${t.sendMenuToSeePrices}\n*${t.orderFormatMessage}*`);
       return NextResponse.json({ success: true });
     }
 
-    // Extract Phone & Address
+    // 5. EXTRACT DATA
     const phoneMatch = text.match(/(\d{10})/);
     const phone = phoneMatch ? phoneMatch[1] : '';
     const cityMatch = text.match(/(?:Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/i);
     const address = cityMatch ? cityMatch[0] : 'Not provided';
 
-    // ✅ 2. CLEAN ITEMS STRING (Remove "total: XXX", phone, city)
     let cleanItems = text.replace(/Order:\s*/i, '')
-      .replace(/(?:total|Total|amount|Amount)\s*:?\s*\d+/gi, '') // Removes "total: 600"
-      .replace(/,\s*\d{10}/, '') // Removes phone
-      .replace(/,\s*(Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/gi, '') // Removes city
-      .replace(/,\s*$/, '').trim(); // Removes trailing comma
+      .replace(/(?:total|Total|amount|Amount)\s*:?\s*\d+/gi, '')
+      .replace(/,\s*\d{10}/, '')
+      .replace(/,\s*(Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/gi, '')
+      .replace(/,\s*$/, '').trim();
 
     let itemsArray = cleanItems.split(',').map(i => i.trim()).filter(i => i.length > 0);
 
-    // ✅ 3. AUTO CALCULATE TOTAL FROM DATABASE
+    // 6. AUTO CALCULATE TOTAL
     let calculatedTotal = 0;
     let replyItems = "";
 
@@ -115,7 +121,6 @@ export async function POST(request) {
 
     if (products && products.length > 0) {
       for (let item of itemsArray) {
-        // Extract quantity and name (e.g., "5kg pyaaz" -> qty: 5, name: pyaaz)
         const match = item.match(/(\d+)\s*(kg|g|l|ml)?\s*([a-zA-Z]+)/i);
         if (match) {
           const qty = parseInt(match[1]);
@@ -136,13 +141,12 @@ export async function POST(request) {
         }
       }
     } else {
-      // Fallback if no price list is set
       replyItems = itemsArray.map(i => `• ${i}`).join('\n');
       const totalMatch = text.match(/(?:total|Total)\s*:?\s*(\d+)/i);
       if (totalMatch) calculatedTotal = parseInt(totalMatch[1], 10);
     }
 
-    // DUPLICATE CHECK (Last 5 minutes)
+    // 7. DUPLICATE CHECK
     const fiveMinutesAgo = new Date();
     fiveMinutesAgo.setMinutes(fiveMinutesAgo.getMinutes() - 5);
     const { data: existingOrder } = await supabase
@@ -154,19 +158,19 @@ export async function POST(request) {
       .single();
 
     if (existingOrder) {
-      console.log('⚠️ Duplicate order - ignored');
+      console.log(t.duplicateOrder);
       return NextResponse.json({ success: true, message: 'Duplicate' });
     }
 
-    // Save order DIRECTLY as Pending with CALCULATED price
+    // 8. SAVE ORDER
     let orderId = null;
     const { data, error } = await supabase
       .from('orders')
       .insert({
         customer_name: firstName,
         customer_chat_id: chatId,
-        items: cleanItems, // Save clean items in DB
-        amount: calculatedTotal, // Save CORRECT calculated price in DB
+        items: cleanItems,
+        amount: calculatedTotal,
         phone: phone,
         address: address,
         status: 'Pending',
@@ -176,14 +180,14 @@ export async function POST(request) {
 
     if (data && data[0]) orderId = data[0].id;
 
-    // Reply to customer with CLEAN formatting
+    // 9. REPLY TO CUSTOMER IN THEIR LANGUAGE
     if (orderId) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://quickcart-dashboard-ten.vercel.app';
       const trackLink = `${appUrl}/track/${orderId}`;
       
-      await sendTelegramMessage(shopBotToken, chatId, 
-        `✅ *Order Received!*\n\n📦 *Items:*\n${replyItems}\n💰 *Calculated Total:* ₹${calculatedTotal}\n📍 *Address:* ${address}\n📞 *Phone:* ${phone}\n\n🔗 *Track:*\n${trackLink}\n\n💾 Shop will confirm shortly.`
-      );
+      const finalMessage = `${t.orderReceived}\n\n${t.items}\n${replyItems}\n${t.calculatedTotal} ₹${calculatedTotal}\n${t.address} ${address}\n${t.phone} ${phone}\n\n${t.track}\n${trackLink}\n\n${t.shopWillConfirmShortly}`;
+      
+      await sendTelegramMessage(shopBotToken, chatId, finalMessage);
     }
 
     return NextResponse.json({ success: true });
