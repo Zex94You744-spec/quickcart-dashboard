@@ -110,7 +110,7 @@ export async function POST(request) {
 
     let itemsArray = cleanItems.split(',').map(i => i.trim()).filter(i => i.length > 0);
 
-    // 6. AUTO CALCULATE TOTAL
+    // ✅ 6. AUTO CALCULATE TOTAL (Unicode Friendly)
     let calculatedTotal = 0;
     let replyItems = "";
 
@@ -121,13 +121,19 @@ export async function POST(request) {
 
     if (products && products.length > 0) {
       for (let item of itemsArray) {
-        const match = item.match(/(\d+)\s*(kg|g|l|ml)?\s*([a-zA-Z]+)/i);
+        // ✅ UPDATED REGEX: Ab ye Odia, Hindi, aur kisi bhi bhasha ke characters ko pakad lega
+        const match = item.match(/(\d+)\s*(kg|g|l|ml)?\s*(.+)/i);
+        
         if (match) {
           const qty = parseInt(match[1]);
           const unit = match[2] || 'kg';
-          const itemName = match[3].toLowerCase();
+          const itemName = match[3].toLowerCase().trim(); // Odia/Hindi text yahan aayega
           
-          const product = products.find(p => p.name.toLowerCase().includes(itemName));
+          // ✅ SMART MATCHING: Database ke name mein item ho, ya item mein database ka name ho
+          const product = products.find(p => 
+            p.name.toLowerCase().includes(itemName) || 
+            itemName.includes(p.name.toLowerCase())
+          );
           
           if (product) {
             const itemTotal = qty * product.price;
@@ -137,6 +143,7 @@ export async function POST(request) {
             replyItems += `• ${item} (Price TBD)\n`;
           }
         } else {
+          // Agar format match nahi hua, toh use as-is chhod do
           replyItems += `• ${item}\n`;
         }
       }
