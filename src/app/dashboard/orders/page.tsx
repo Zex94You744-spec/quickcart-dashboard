@@ -46,8 +46,22 @@ export default function OrdersPage() {
   }
 
   async function handleUpdateStatus(orderId: string, newStatus: string, rejectionReason?: string) {
-    const { data: orderData } = await supabase.from('orders').select('customer_chat_id, shop_owner_email').eq('id', orderId).single();
-    const { data: shopData } = await supabase.from('leads').select('bot_token').eq('email', orderData?.shop_owner_email).single();
+  // ✅ 1. UPDATED STATUS UPDATE FUNCTION
+  async function handleUpdateStatus(orderId: string, newStatus: string, rejectionReason?: string) {
+    // Fetch order data
+    const { data: orderData } = await supabase
+      .from('orders')
+      .select('customer_chat_id, shop_owner_email')
+      .eq('id', orderId)
+      .single();
+    
+    // ✅ CRITICAL FIX: 'phone' ko bhi select karo taaki WhatsApp link ban sake
+    const { data: shopData } = await supabase
+      .from('leads')
+      .select('bot_token, phone')
+      .eq('email', orderData?.shop_owner_email)
+      .single();
+    
     const shopBotToken = shopData?.bot_token;
 
     // Update data with optional rejection reason
@@ -79,7 +93,12 @@ export default function OrdersPage() {
         } else if (newStatus === 'Delivered') {
           message = `✅ *Order Delivered!*\n\nThank you for shopping with us! 🙏`;
         } else if (newStatus === 'Rejected') {
-          message = `❌ *Maafi chahte hain, aapka order reject kar diya gaya hai.*\n\n*Reason:* ${rejectionReason || 'Not specified'}\n\nPlease contact the shop for more details.`;
+          // ✅ UPDATED REJECTION MESSAGE WITH PHONE & WHATSAPP LINK
+          const shopPhone = shopData?.phone || 'Not available';
+          const cleanPhone = shopPhone.replace(/\D/g, ''); // Sirf numbers rakho
+          const whatsappLink = cleanPhone ? `https://wa.me/91${cleanPhone}` : '#';
+          
+          message = `❌ *Maafi chahte hain, aapka order reject kar diya gaya hai.*\n\n*Reason:* ${rejectionReason || 'Not specified'}\n\n📞 *Contact Shop:* ${shopPhone}\n📱 *WhatsApp:* [Click Here to Chat](${whatsappLink})\n\nPlease contact the shop for more details.`;
         }
 
         if (message) {
@@ -96,7 +115,7 @@ export default function OrdersPage() {
     }
   }
 
-  // ✅ NEW: Dedicated Reject Handler with Prompt
+  // ✅ 2. DEDICATED REJECT HANDLER WITH PROMPT
   async function handleRejectClick(orderId: string) {
     const reason = prompt("⚠️ Please enter the reason for rejection:\n(e.g., Out of stock, Delivery area not covered, Shop closed)");
     
