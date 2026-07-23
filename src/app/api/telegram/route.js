@@ -99,7 +99,7 @@ export async function POST(request) {
     // 5. EXTRACT DATA
     const phoneMatch = text.match(/(\d{10})/);
     const phone = phoneMatch ? phoneMatch[1] : '';
-    const cityMatch = text.match(/(?:Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/i);
+    const cityMatch = text.match(/(?:Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad|Bhubaneswar|ଭୁବନେଶ୍ୱର|Cuttack|କଟକ|Rourkela|ରାଉରକେଲା|Berhampur|ବ୍ରହ୍ମପୁର)/i);
     const address = cityMatch ? cityMatch[0] : 'Not provided';
 
     let cleanItems = text.replace(/Order:\s*/i, '')
