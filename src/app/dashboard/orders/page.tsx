@@ -45,12 +45,16 @@ export default function OrdersPage() {
     }
   }
 
-  async function handleUpdateStatus(orderId: string, newStatus: string) {
+  async function handleUpdateStatus(orderId: string, newStatus: string, rejectionReason?: string) {
     const { data: orderData } = await supabase.from('orders').select('customer_chat_id, shop_owner_email').eq('id', orderId).single();
     const { data: shopData } = await supabase.from('leads').select('bot_token').eq('email', orderData?.shop_owner_email).single();
     const shopBotToken = shopData?.bot_token;
 
-    const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
+    // Update data with optional rejection reason
+    const updateData: any = { status: newStatus };
+    if (rejectionReason) updateData.rejection_reason = rejectionReason;
+
+    const { error } = await supabase.from('orders').update(updateData).eq('id', orderId);
 
     if (!error) {
       if (newStatus === 'Confirmed' && orderData?.customer_chat_id) {
@@ -68,10 +72,15 @@ export default function OrdersPage() {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://quickcart-dashboard-ten.vercel.app';
         const trackLink = `${appUrl}/track/${orderId}`;
 
-        if (newStatus === 'Confirmed') message = `✅ *Order Confirmed!*\n\nShop will process your order shortly.\n\nTrack live: ${trackLink}`;
-        else if (newStatus === 'Out for Delivery') message = `🚴 *Your order is out for delivery!*\n\nTrack live: ${trackLink}`;
-        else if (newStatus === 'Delivered') message = `✅ *Order Delivered!*\n\nThank you for shopping with us! `;
-        else if (newStatus === 'Rejected') message = `❌ Maafi chahte hain, lekin aapka order reject kar diya gaya hai.`;
+        if (newStatus === 'Confirmed') {
+          message = `✅ *Order Confirmed!*\n\nShop will process your order shortly.\n\nTrack live: ${trackLink}`;
+        } else if (newStatus === 'Out for Delivery') {
+          message = `🚴 *Your order is out for delivery!*\n\nTrack live: ${trackLink}`;
+        } else if (newStatus === 'Delivered') {
+          message = `✅ *Order Delivered!*\n\nThank you for shopping with us! 🙏`;
+        } else if (newStatus === 'Rejected') {
+          message = `❌ *Maafi chahte hain, aapka order reject kar diya gaya hai.*\n\n*Reason:* ${rejectionReason || 'Not specified'}\n\nPlease contact the shop for more details.`;
+        }
 
         if (message) {
           try {
@@ -84,6 +93,21 @@ export default function OrdersPage() {
         }
       }
       fetchData(userEmail);
+    }
+  }
+
+  // ✅ NEW: Dedicated Reject Handler with Prompt
+  async function handleRejectClick(orderId: string) {
+    const reason = prompt("⚠️ Please enter the reason for rejection:\n(e.g., Out of stock, Delivery area not covered, Shop closed)");
+    
+    if (!reason || reason.trim() === "") {
+      alert("Rejection reason is required to inform the customer.");
+      return; // Cancel rejection if no reason provided
+    }
+
+    if (confirm(`Are you sure you want to reject this order?\n\nReason: "${reason}"`)) {
+      await handleUpdateStatus(orderId, 'Rejected', reason.trim());
+      alert("Order rejected and customer notified.");
     }
   }
 
@@ -125,7 +149,7 @@ export default function OrdersPage() {
                           return (
                             <div className="flex gap-2">
                               <button onClick={() => handleUpdateStatus(order.id, 'Confirmed')} className="text-xs bg-green-100 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-200 transition font-semibold">Confirm Order</button>
-                              <button onClick={() => handleUpdateStatus(order.id, 'Rejected')} className="text-xs bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-200 transition font-semibold">Reject</button>
+                              <button onClick={() => handleRejectClick(order.id)} className="text-xs bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-200 transition font-semibold">Reject</button>
                             </div>
                           );
                         case 'Confirmed':
@@ -135,7 +159,7 @@ export default function OrdersPage() {
                         case 'Delivered':
                           return <span className="text-xs bg-gray-100 text-gray-500 border border-gray-200 px-3 py-1.5 rounded-lg font-semibold">✅ Completed</span>;
                         case 'Rejected':
-                          return <span className="text-xs bg-red-100 text-red-500 border border-red-200 px-3 py-1.5 rounded-lg font-semibold">❌ Rejected</span>;
+                          return <span className="text-xs bg-red-100 text-red-500 border border-red-200 px-3 py-1.5 rounded-lg font-semibold" title={order.rejection_reason}>❌ Rejected</span>;
                         default:
                           return <span className="text-xs bg-gray-100 text-gray-500 px-3 py-1.5 rounded-lg">No Actions</span>;
                       }
@@ -148,7 +172,7 @@ export default function OrdersPage() {
                           <div className="font-medium text-gray-900">{order.customer_name || 'N/A'}</div>
                           <div className="text-xs text-gray-500">{order.phone || 'No Phone'}</div>
                         </td>
-                        <td className="px-6 py-4 text-gray-600 max-w-xs truncate">{order.items}</td>
+                        <td className="px-6 py-4 text-gray-600 max-w-xs truncate" title={order.items}>{order.items}</td>
                         <td className="px-6 py-4 font-semibold text-gray-900">₹{order.amount}</td>
                         <td className="px-6 py-4">
                           <span className={`px-3 py-1 rounded-full text-xs font-bold ${
@@ -158,6 +182,11 @@ export default function OrdersPage() {
                           }`}>
                             {order.status}
                           </span>
+                          {order.status === 'Rejected' && order.rejection_reason && (
+                            <div className="text-[10px] text-red-600 mt-1 italic max-w-[150px] truncate" title={order.rejection_reason}>
+                              "{order.rejection_reason}"
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-gray-500 text-xs">{new Date(order.created_at).toLocaleDateString('en-IN')}</td>
                         <td className="px-6 py-4">{renderActionButtons()}</td>
