@@ -59,24 +59,25 @@ export async function POST(request) {
       const { data: products } = await supabase
         .from('products')
         .select('name, unit, price')
-        .eq('shop_owner_email', targetShopEmail);
+        .eq('shop_owner_email', targetShopEmail)
+        .order('created_at', { ascending: true });
 
       if (products && products.length > 0) {
-        let menuText = ` *Our Price List*\n\n`;
+        let menuText = `🏪 *Our Price List*\n\n`;
         products.forEach(p => {
           menuText += `• ${p.name} (${p.unit}): ₹${p.price}\n`;
         });
-        menuText += `\n📝 *How to order:*\nOrder: 2kg pyaaz, 1kg aalu, Delhi, 9988776655`;
+        menuText += `\n📝 *How to order:*\nOrder: 2kg pyaaz, 1kg aalu, Delhi, 9876543210`;
         await sendTelegramMessage(shopBotToken, chatId, menuText);
       } else {
-        await sendTelegramMessage(shopBotToken, chatId, " Price list is currently empty. Please try again later.");
+        await sendTelegramMessage(shopBotToken, chatId, "📭 Price list is currently empty. Please try again later.");
       }
       return NextResponse.json({ success: true });
     }
 
     // Commands
     if (lowerText.startsWith('/')) {
-      await sendTelegramMessage(shopBotToken, chatId, `*Welcome!* Send /menu to see prices.\n\n*Order format:*\nOrder: 2kg sugar, total: 350, Delhi, 9876543210`);
+      await sendTelegramMessage(shopBotToken, chatId, `*Welcome!* Send /menu to see prices.\n\n*Order format:*\nOrder: 2kg pyaaz, Delhi, 9876543210`);
       return NextResponse.json({ success: true });
     }
 
@@ -94,18 +95,19 @@ export async function POST(request) {
     const cityMatch = text.match(/(?:Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/i);
     const address = cityMatch ? cityMatch[0] : 'Not provided';
 
-    // Clean Items String
+    // ✅ 2. CLEAN ITEMS STRING (Remove "total: XXX", phone, city)
     let cleanItems = text.replace(/Order:\s*/i, '')
-      .replace(/,\s*\d{10}/, '')
-      .replace(/,\s*(Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/gi, '')
-      .replace(/,\s*$/, '').trim();
+      .replace(/(?:total|Total|amount|Amount)\s*:?\s*\d+/gi, '') // Removes "total: 600"
+      .replace(/,\s*\d{10}/, '') // Removes phone
+      .replace(/,\s*(Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/gi, '') // Removes city
+      .replace(/,\s*$/, '').trim(); // Removes trailing comma
 
-    // ✅ 2. AUTO CALCULATE TOTAL FROM DATABASE
-    let calculatedTotal = 0;
     let itemsArray = cleanItems.split(',').map(i => i.trim()).filter(i => i.length > 0);
-    let finalItemsText = "";
 
-    // Fetch shop's price list
+    // ✅ 3. AUTO CALCULATE TOTAL FROM DATABASE
+    let calculatedTotal = 0;
+    let replyItems = "";
+
     const { data: products } = await supabase
       .from('products')
       .select('name, price')
@@ -117,27 +119,25 @@ export async function POST(request) {
         const match = item.match(/(\d+)\s*(kg|g|l|ml)?\s*([a-zA-Z]+)/i);
         if (match) {
           const qty = parseInt(match[1]);
+          const unit = match[2] || 'kg';
           const itemName = match[3].toLowerCase();
           
-          // Find price in DB
           const product = products.find(p => p.name.toLowerCase().includes(itemName));
           
           if (product) {
             const itemTotal = qty * product.price;
             calculatedTotal += itemTotal;
-            finalItemsText += `${qty}kg ${product.name} (₹${itemTotal}), `;
+            replyItems += `• ${qty}${unit} ${product.name} (₹${itemTotal})\n`;
           } else {
-            // If item not in price list, keep original text and add 0
-            finalItemsText += `${item} (Price TBD), `;
+            replyItems += `• ${item} (Price TBD)\n`;
           }
         } else {
-          finalItemsText += `${item}, `;
+          replyItems += `• ${item}\n`;
         }
       }
-      finalItemsText = finalItemsText.replace(/,\s*$/, '');
     } else {
       // Fallback if no price list is set
-      finalItemsText = cleanItems;
+      replyItems = itemsArray.map(i => `• ${i}`).join('\n');
       const totalMatch = text.match(/(?:total|Total)\s*:?\s*(\d+)/i);
       if (totalMatch) calculatedTotal = parseInt(totalMatch[1], 10);
     }
@@ -150,7 +150,6 @@ export async function POST(request) {
       .select('id')
       .eq('customer_chat_id', chatId)
       .eq('amount', calculatedTotal)
-      .eq('items', finalItemsText)
       .gte('created_at', fiveMinutesAgo.toISOString())
       .single();
 
@@ -159,31 +158,31 @@ export async function POST(request) {
       return NextResponse.json({ success: true, message: 'Duplicate' });
     }
 
-    // Save order DIRECTLY as Pending (No manual price setting needed!)
+    // Save order DIRECTLY as Pending with CALCULATED price
     let orderId = null;
     const { data, error } = await supabase
       .from('orders')
       .insert({
         customer_name: firstName,
         customer_chat_id: chatId,
-        items: finalItemsText,
-        amount: calculatedTotal,
+        items: cleanItems, // Save clean items in DB
+        amount: calculatedTotal, // Save CORRECT calculated price in DB
         phone: phone,
         address: address,
-        status: 'Pending', // Directly Pending!
+        status: 'Pending',
         shop_owner_email: targetShopEmail
       })
       .select();
 
     if (data && data[0]) orderId = data[0].id;
 
-    // Reply to customer
+    // Reply to customer with CLEAN formatting
     if (orderId) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://quickcart-dashboard-ten.vercel.app';
       const trackLink = `${appUrl}/track/${orderId}`;
       
       await sendTelegramMessage(shopBotToken, chatId, 
-        `✅ *Order Received!*\n\n📦 *Items:*\n• ${finalItemsText}\n\n💰 *Total:* ₹${calculatedTotal}\n📍 *Address:* ${address}\n📞 *Phone:* ${phone}\n\n🔗 *Track:*\n${trackLink}\n\n💾 Shop will confirm shortly.`
+        `✅ *Order Received!*\n\n📦 *Items:*\n${replyItems}\n💰 *Calculated Total:* ₹${calculatedTotal}\n📍 *Address:* ${address}\n📞 *Phone:* ${phone}\n\n🔗 *Track:*\n${trackLink}\n\n💾 Shop will confirm shortly.`
       );
     }
 
