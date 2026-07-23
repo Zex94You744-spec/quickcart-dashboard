@@ -36,9 +36,8 @@ export async function POST(request) {
     
     let targetShopEmail = null;
     let shopBotToken = incomingBotToken;
-    let shopLanguage = 'hindi'; // Default language
+    let shopLanguage = 'hindi';
 
-    // 1. Fetch Shop Owner & Language
     if (incomingBotToken) {
       const { data: shopOwner } = await supabase
         .from('leads')
@@ -53,10 +52,9 @@ export async function POST(request) {
       }
     }
 
-    // Load Translations
     const t = getTranslation(shopLanguage);
 
-    // 2. HANDLE /MENU OR /PRICE COMMAND
+    // 1. HANDLE /MENU OR /PRICE COMMAND
     if (lowerText === '/menu' || lowerText === '/price' || lowerText === 'menu') {
       if (!targetShopEmail) {
         await sendTelegramMessage(shopBotToken, chatId, t.shopNotFound);
@@ -82,13 +80,13 @@ export async function POST(request) {
       return NextResponse.json({ success: true });
     }
 
-    // 3. OTHER COMMANDS
+    // 2. OTHER COMMANDS
     if (lowerText.startsWith('/')) {
       await sendTelegramMessage(shopBotToken, chatId, `${t.welcomeMessage}\n${t.orderFormat}`);
       return NextResponse.json({ success: true });
     }
 
-    // 4. ORDER DETECTION
+    // 3. ORDER DETECTION
     const isLikelyOrder = lowerText.includes('order:') || /\d{10}/.test(text);
 
     if (!isLikelyOrder) {
@@ -96,38 +94,42 @@ export async function POST(request) {
       return NextResponse.json({ success: true });
     }
 
-    // 1. Extract Phone Number (10 digits)
+    // ✅ 4. SMART EXTRACTION (No Hardcoded Cities!)
     const phoneMatch = text.match(/(\d{10})/);
     const phone = phoneMatch ? phoneMatch[1] : '';
 
-    // 2. Clean the text: remove "Order:", "total: XXX", and the phone number
     let cleanText = text
       .replace(/Order:\s*/i, '')
       .replace(/(?:total|Total|amount|Amount)\s*:?\s*\d+/gi, '')
-      .replace(/,\s*\d{10}/, '') // removes ", 7896431205"
-      .replace(/\d{10}/, '')     // removes "7896431205" if no comma
+      .replace(/,\s*\d{10}/, '')
+      .replace(/\d{10}/, '')
       .trim();
 
-    // 3. Split by comma to analyze each part
     const parts = cleanText.split(',').map(p => p.trim()).filter(p => p.length > 0);
 
     let itemsArray = [];
     let addressParts = [];
 
     for (let part of parts) {
-      // If it has a number and looks like an item (e.g., "2kg ପିଆଜ", "500g milk", "3 pkt")
+      // Agar number aur unit hai (jaise 2kg, 500g), toh ye ITEM hai
       if (/(\d+)\s*(kg|g|l|ml|pcs|pkt)?\s*/i.test(part)) {
         itemsArray.push(part);
       } else {
-        // Otherwise, it's part of the address (e.g., "Bhubaneswar", "Sector 4", "ଭୁବନେଶ୍ୱର", "କଟକ")
+        // Nahi toh ye ADDRESS hai (chahe Odia ho, Hindi ho, ya English)
         addressParts.push(part);
       }
     }
 
-    // Join address parts back together
-    const address = addressParts.length > 0 ? addressParts.join(', ') : 'Not provided';
+    // Fallback: Agar koi item detect nahi hua, toh pura text item maan lo
+    if (itemsArray.length === 0) {
+      itemsArray = [cleanText];
+      addressParts = [];
+    }
 
-    // ✅ 6. AUTO CALCULATE TOTAL (With Debug Logs)
+    const address = addressParts.length > 0 ? addressParts.join(', ') : 'Not provided';
+    const cleanItems = itemsArray.join(', '); // ✅ FIX: Database ke liye define kiya
+
+    // ✅ 5. AUTO CALCULATE TOTAL
     let calculatedTotal = 0;
     let replyItems = "";
 
@@ -137,31 +139,23 @@ export async function POST(request) {
       .eq('shop_owner_email', targetShopEmail);
 
     if (products && products.length > 0) {
-      console.log('🔍 DEBUG: Products in DB:', products.map(p => p.name));
-      
       for (let item of itemsArray) {
-        // Regex jo numbers, unit, aur baaki text (Odia/Hindi/English) ko pakde
         const match = item.match(/(\d+)\s*(kg|g|l|ml)?\s*(.+)/i);
-        
         if (match) {
           const qty = parseInt(match[1]);
           const unit = match[2] || 'kg';
-          const itemName = match[3].toLowerCase().trim(); 
+          const itemName = match[3].toLowerCase().trim();
           
-          console.log(`🔍 DEBUG: Checking customer item: "${itemName}"`);
-
-          // Super flexible matching: DB name mein customer text ho, YA customer text mein DB name ho
-          const product = products.find(p => {
-            const dbName = p.name.toLowerCase().trim();
-            return dbName.includes(itemName) || itemName.includes(dbName);
-          });
+          const product = products.find(p => 
+            p.name.toLowerCase().includes(itemName) || 
+            itemName.includes(p.name.toLowerCase())
+          );
           
           if (product) {
             const itemTotal = qty * product.price;
             calculatedTotal += itemTotal;
             replyItems += `• ${qty}${unit} ${product.name} (₹${itemTotal})\n`;
           } else {
-            console.log(`⚠️ DEBUG: NO MATCH found for "${itemName}" in DB`);
             replyItems += `• ${item} (Price TBD)\n`;
           }
         } else {
@@ -169,13 +163,12 @@ export async function POST(request) {
         }
       }
     } else {
-      console.log('⚠️ DEBUG: No products found in DB for this shop!');
       replyItems = itemsArray.map(i => `• ${i}`).join('\n');
       const totalMatch = text.match(/(?:total|Total)\s*:?\s*(\d+)/i);
       if (totalMatch) calculatedTotal = parseInt(totalMatch[1], 10);
     }
 
-    // ✅ 7. SMART DUPLICATE CHECK (Last 5 minutes)
+    // ✅ 6. SMART DUPLICATE CHECK
     const fiveMinutesAgo = new Date();
     fiveMinutesAgo.setMinutes(fiveMinutesAgo.getMinutes() - 5);
     
@@ -183,25 +176,24 @@ export async function POST(request) {
       .from('orders')
       .select('id')
       .eq('customer_chat_id', chatId)
-      .eq('items', cleanItems) // ✅ Ab ye items ko bhi check karega, sirf amount ko nahi
+      .eq('items', cleanItems)
       .gte('created_at', fiveMinutesAgo.toISOString())
       .single();
 
     if (existingOrder) {
       console.log('⚠️ DEBUG: Duplicate order detected');
-      // Silent fail ki jagah user ko polite message bhejo
       await sendTelegramMessage(shopBotToken, chatId, "⚠️ ଏହି ଅର୍ଡରଟି ପୂର୍ବରୁ ଗ୍ରହଣ କରାଯାଇସାରିଛି। (This order was already received recently.)");
       return NextResponse.json({ success: true, message: 'Duplicate' });
     }
 
-    // 8. SAVE ORDER
+    // ✅ 7. SAVE ORDER
     let orderId = null;
     const { data, error } = await supabase
       .from('orders')
       .insert({
         customer_name: firstName,
         customer_chat_id: chatId,
-        items: cleanItems,
+        items: cleanItems, // ✅ Ab ye perfectly defined hai
         amount: calculatedTotal,
         phone: phone,
         address: address,
@@ -212,7 +204,7 @@ export async function POST(request) {
 
     if (data && data[0]) orderId = data[0].id;
 
-    // 9. REPLY TO CUSTOMER IN THEIR LANGUAGE
+    // ✅ 8. REPLY TO CUSTOMER
     if (orderId) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://quickcart-dashboard-ten.vercel.app';
       const trackLink = `${appUrl}/track/${orderId}`;
