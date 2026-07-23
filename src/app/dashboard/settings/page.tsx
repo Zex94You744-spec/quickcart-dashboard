@@ -8,14 +8,15 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const languages = [
+  { code: 'odia', name: 'Odia', native: 'ଓଡ଼ିଆ', flag: '🇮🇳' }, // ✅ YE ADD KARO
   { code: 'hindi', name: 'Hindi', native: 'हिंदी', flag: '🇮🇳' },
   { code: 'english', name: 'English', native: 'English', flag: '🇬🇧' },
   { code: 'marathi', name: 'Marathi', native: 'मराठी', flag: '🇮🇳' },
   { code: 'gujarati', name: 'Gujarati', native: 'ગુજરાતી', flag: '🇮🇳' },
   { code: 'tamil', name: 'Tamil', native: 'தமிழ்', flag: '🇮🇳' },
   { code: 'telugu', name: 'Telugu', native: 'తెలుగు', flag: '🇮🇳' },
-  { code: 'bengali', name: 'Bengali', native: 'বাংলা', flag: '🇮' },
-  { code: 'kannada', name: 'Kannada', native: 'ಕನ್ನಡ', flag: '🇳' },
+  { code: 'bengali', name: 'Bengali', native: 'বাংলা', flag: '🇮🇳' },
+  { code: 'kannada', name: 'Kannada', native: 'ಕನ್ನಡ', flag: '🇮🇳' },
   { code: 'punjabi', name: 'Punjabi', native: 'ਪੰਜਾਬੀ', flag: '🇮🇳' },
 ];
 
