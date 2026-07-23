@@ -45,14 +45,12 @@ export default function OrdersPage() {
     }
   }
 
-  // Standard Status Update Function
   async function handleUpdateStatus(orderId: string, newStatus: string) {
     const { data: orderData } = await supabase.from('orders').select('customer_chat_id, shop_owner_email').eq('id', orderId).single();
     const { data: shopData } = await supabase.from('leads').select('bot_token').eq('email', orderData?.shop_owner_email).single();
     const shopBotToken = shopData?.bot_token;
 
-    const updateData: any = { status: newStatus };
-    const { error } = await supabase.from('orders').update(updateData).eq('id', orderId);
+    const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
 
     if (!error) {
       if (newStatus === 'Confirmed' && orderData?.customer_chat_id) {
@@ -86,36 +84,6 @@ export default function OrdersPage() {
         }
       }
       fetchData(userEmail);
-      alert(`Order status updated to ${newStatus}!`);
-    }
-  }
-
-  // Price Confirmation Function
-  async function confirmPrice(orderId: string, finalAmount: number) {
-    const { error } = await supabase
-      .from('orders')
-      .update({ amount: finalAmount, status: 'Awaiting Customer Approval' })
-      .eq('id', orderId);
-
-    if (!error) {
-      const { data: orderData } = await supabase.from('orders').select('customer_chat_id, shop_owner_email').eq('id', orderId).single();
-      const { data: shopData } = await supabase.from('leads').select('bot_token').eq('email', orderData?.shop_owner_email).single();
-
-      if (orderData?.customer_chat_id && shopData?.bot_token) {
-        const message = `📋 *Price Confirmation Required*\n\nYour order total has been updated by the shop.\n\n*Final Amount:* ₹${finalAmount}\n\nPlease reply *YES* to confirm or *NO* to cancel.`;
-        
-        try {
-          await fetch('/api/send-telegram-message', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ botToken: shopData.bot_token, chatId: orderData.customer_chat_id, message })
-          });
-        } catch (err) { console.error('Telegram send failed:', err); }
-      }
-      fetchData(userEmail);
-      alert(`Price sent to customer for confirmation!`);
-    } else {
-      alert('Failed to confirm price');
     }
   }
 
@@ -128,7 +96,7 @@ export default function OrdersPage() {
           <div>
             <button onClick={() => router.push('/dashboard')} className="text-blue-600 hover:text-blue-800 font-medium mb-2 flex items-center gap-2">← Back to Dashboard</button>
             <h1 className="text-3xl font-bold text-gray-900">Manage Orders 📦</h1>
-            <p className="text-gray-600 mt-1">View, confirm prices, and update order statuses step-by-step.</p>
+            <p className="text-gray-600 mt-1">View and update order statuses step-by-step.</p>
           </div>
         </div>
 
@@ -151,48 +119,19 @@ export default function OrdersPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-sm">
                   {orders.map((order) => {
-                    
-                    // ✅ SEQUENTIAL BUTTON LOGIC (NO DROPDOWNS!)
                     const renderActionButtons = () => {
                       switch (order.status) {
-                        case 'Pending Price Confirmation':
-                          return (
-                            <div className="flex gap-2">
-                              <button onClick={() => {
-                                const newAmount = prompt(`Enter final amount (Current: ₹${order.amount}):`, String(order.amount));
-                                if (newAmount && !isNaN(Number(newAmount))) confirmPrice(order.id, Number(newAmount));
-                              }} className="text-xs bg-yellow-100 text-yellow-700 border border-yellow-200 px-3 py-1.5 rounded-lg hover:bg-yellow-200 transition font-semibold">
-                                Set Final Price
-                              </button>
-                              <button onClick={() => handleUpdateStatus(order.id, 'Rejected')} className="text-xs bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-200 transition font-semibold">
-                                Reject
-                              </button>
-                            </div>
-                          );
-                        case 'Awaiting Customer Approval':
-                          return <span className="text-xs bg-blue-100 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg font-semibold"> Waiting for Customer...</span>;
                         case 'Pending':
                           return (
-                            <button onClick={() => handleUpdateStatus(order.id, 'Confirmed')} className="text-xs bg-green-100 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-200 transition font-semibold">
-                              Confirm Order
-                            </button>
+                            <div className="flex gap-2">
+                              <button onClick={() => handleUpdateStatus(order.id, 'Confirmed')} className="text-xs bg-green-100 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-200 transition font-semibold">Confirm Order</button>
+                              <button onClick={() => handleUpdateStatus(order.id, 'Rejected')} className="text-xs bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-200 transition font-semibold">Reject</button>
+                            </div>
                           );
                         case 'Confirmed':
-                          return (
-                            <button onClick={() => handleUpdateStatus(order.id, 'Out for Delivery')} className="text-xs bg-blue-100 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-200 transition font-semibold">
-                              Mark Out for Delivery
-                            </button>
-                          );
+                          return <button onClick={() => handleUpdateStatus(order.id, 'Out for Delivery')} className="text-xs bg-blue-100 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-200 transition font-semibold">Mark Out for Delivery</button>;
                         case 'Out for Delivery':
-                          return (
-                            <button onClick={() => {
-                              if (confirm("⚠️ Are you sure this order has been delivered to the customer?")) {
-                                handleUpdateStatus(order.id, 'Delivered');
-                              }
-                            }} className="text-xs bg-purple-100 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-lg hover:bg-purple-200 transition font-semibold">
-                              Mark Delivered
-                            </button>
-                          );
+                          return <button onClick={() => { if (confirm("⚠️ Are you sure this order has been delivered?")) handleUpdateStatus(order.id, 'Delivered'); }} className="text-xs bg-purple-100 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-lg hover:bg-purple-200 transition font-semibold">Mark Delivered</button>;
                         case 'Delivered':
                           return <span className="text-xs bg-gray-100 text-gray-500 border border-gray-200 px-3 py-1.5 rounded-lg font-semibold">✅ Completed</span>;
                         case 'Rejected':
@@ -213,21 +152,15 @@ export default function OrdersPage() {
                         <td className="px-6 py-4 font-semibold text-gray-900">₹{order.amount}</td>
                         <td className="px-6 py-4">
                           <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                            order.status === 'Pending Price Confirmation' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
-                            order.status === 'Awaiting Customer Approval' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
                             order.status === 'Delivered' || order.status === 'Confirmed' ? 'bg-green-50 text-green-700 border border-green-200' :
                             order.status === 'Rejected' ? 'bg-red-50 text-red-700 border border-red-200' :
                             'bg-orange-50 text-orange-700 border border-orange-200'
                           }`}>
-                            {order.status === 'Pending Price Confirmation' ? '⏳ Set Price' :
-                             order.status === 'Awaiting Customer Approval' ? '⏳ Waiting Customer' :
-                             order.status}
+                            {order.status}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-gray-500 text-xs">{new Date(order.created_at).toLocaleDateString('en-IN')}</td>
-                        <td className="px-6 py-4">
-                          {renderActionButtons()}
-                        </td>
+                        <td className="px-6 py-4">{renderActionButtons()}</td>
                       </tr>
                     );
                   })}

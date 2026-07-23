@@ -49,93 +49,108 @@ export async function POST(request) {
       }
     }
 
-    // ✅ HANDLE YES/NO REPLY FOR PRICE CONFIRMATION
-    if (lowerText === 'yes' || lowerText === 'no' || lowerText === 'y' || lowerText === 'n') {
-      // Check karo ki koi pending price confirmation order hai
-      const { data: pendingOrders } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('customer_chat_id', chatId)
-        .eq('status', 'Pending Price Confirmation')
-        .order('created_at', { ascending: false })
-        .limit(1);
+    // ✅ 1. HANDLE /MENU OR /PRICE COMMAND
+    if (lowerText === '/menu' || lowerText === '/price' || lowerText === 'menu') {
+      if (!targetShopEmail) {
+        await sendTelegramMessage(shopBotToken, chatId, "⚠️ Shop not found. Please contact support.");
+        return NextResponse.json({ success: true });
+      }
 
-      if (pendingOrders && pendingOrders.length > 0) {
-        const order = pendingOrders[0];
-        
-        if (lowerText === 'yes' || lowerText === 'y') {
-          // Customer ne price confirm kar di!
-          await supabase
-            .from('orders')
-            .update({ 
-              status: 'Pending',
-              price_confirmed: true
-            })
-            .eq('id', order.id);
+      const { data: products } = await supabase
+        .from('products')
+        .select('name, unit, price')
+        .eq('shop_owner_email', targetShopEmail);
 
-          await sendTelegramMessage(shopBotToken, chatId, 
-            `✅ *Thank You!*\n\nYour order has been confirmed.\n\n*Order ID:* #${String(order.id).slice(0, 8).toUpperCase()}\n*Final Amount:* ₹${order.amount}\n\nShop will process your order shortly.`
-          );
-        } else {
-          // Customer ne price reject kar di
-          await supabase
-            .from('orders')
-            .update({ status: 'Rejected' })
-            .eq('id', order.id);
-
-          await sendTelegramMessage(shopBotToken, chatId, 
-            `❌ Order cancelled. Please contact the shop for more details.`
-          );
-        }
+      if (products && products.length > 0) {
+        let menuText = ` *Our Price List*\n\n`;
+        products.forEach(p => {
+          menuText += `• ${p.name} (${p.unit}): ₹${p.price}\n`;
+        });
+        menuText += `\n📝 *How to order:*\nOrder: 2kg pyaaz, 1kg aalu, Delhi, 9988776655`;
+        await sendTelegramMessage(shopBotToken, chatId, menuText);
+      } else {
+        await sendTelegramMessage(shopBotToken, chatId, " Price list is currently empty. Please try again later.");
       }
       return NextResponse.json({ success: true });
     }
 
     // Commands
     if (lowerText.startsWith('/')) {
-      await sendTelegramMessage(shopBotToken, chatId, 
-        `*Welcome!* Send order like this:\n*Order: 2kg sugar, total: 350, Delhi, 9876543210*`
-      );
+      await sendTelegramMessage(shopBotToken, chatId, `*Welcome!* Send /menu to see prices.\n\n*Order format:*\nOrder: 2kg sugar, total: 350, Delhi, 9876543210`);
       return NextResponse.json({ success: true });
     }
 
     // Order detection
-    const isLikelyOrder = lowerText.includes('total') || lowerText.includes('order:') || /\d{10}/.test(text);
+    const isLikelyOrder = lowerText.includes('order:') || /\d{10}/.test(text);
 
     if (!isLikelyOrder) {
-      await sendTelegramMessage(shopBotToken, chatId, 
-        `👋 Please send order like:\n*Order: 2kg sugar, total: 350, Delhi, 9876543210*`
-      );
+      await sendTelegramMessage(shopBotToken, chatId, `👋 Please send /menu to see prices or send order like:\n*Order: 2kg pyaaz, Delhi, 9876543210*`);
       return NextResponse.json({ success: true });
     }
 
-    // Extract data
-    let customerAmount = 0;
-    const totalMatch = text.match(/(?:total|Total)\s*:?\s*(\d+)/i);
-    if (totalMatch) customerAmount = parseInt(totalMatch[1], 10);
-
+    // Extract Phone & Address
     const phoneMatch = text.match(/(\d{10})/);
     const phone = phoneMatch ? phoneMatch[1] : '';
-
-    let cleanItems = text.replace(/Order:\s*/i, '')
-      .replace(/(?:total|Total)\s*:?\s*\d+/gi, '')
-      .replace(/,\s*\d{10}/, '')
-      .replace(/,\s*(Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/gi, '')
-      .replace(/,\s*$/, '').trim();
-    
     const cityMatch = text.match(/(?:Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/i);
     const address = cityMatch ? cityMatch[0] : 'Not provided';
 
-    // ✅ DUPLICATE CHECK (Last 5 minutes)
+    // Clean Items String
+    let cleanItems = text.replace(/Order:\s*/i, '')
+      .replace(/,\s*\d{10}/, '')
+      .replace(/,\s*(Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/gi, '')
+      .replace(/,\s*$/, '').trim();
+
+    // ✅ 2. AUTO CALCULATE TOTAL FROM DATABASE
+    let calculatedTotal = 0;
+    let itemsArray = cleanItems.split(',').map(i => i.trim()).filter(i => i.length > 0);
+    let finalItemsText = "";
+
+    // Fetch shop's price list
+    const { data: products } = await supabase
+      .from('products')
+      .select('name, price')
+      .eq('shop_owner_email', targetShopEmail);
+
+    if (products && products.length > 0) {
+      for (let item of itemsArray) {
+        // Extract quantity and name (e.g., "5kg pyaaz" -> qty: 5, name: pyaaz)
+        const match = item.match(/(\d+)\s*(kg|g|l|ml)?\s*([a-zA-Z]+)/i);
+        if (match) {
+          const qty = parseInt(match[1]);
+          const itemName = match[3].toLowerCase();
+          
+          // Find price in DB
+          const product = products.find(p => p.name.toLowerCase().includes(itemName));
+          
+          if (product) {
+            const itemTotal = qty * product.price;
+            calculatedTotal += itemTotal;
+            finalItemsText += `${qty}kg ${product.name} (₹${itemTotal}), `;
+          } else {
+            // If item not in price list, keep original text and add 0
+            finalItemsText += `${item} (Price TBD), `;
+          }
+        } else {
+          finalItemsText += `${item}, `;
+        }
+      }
+      finalItemsText = finalItemsText.replace(/,\s*$/, '');
+    } else {
+      // Fallback if no price list is set
+      finalItemsText = cleanItems;
+      const totalMatch = text.match(/(?:total|Total)\s*:?\s*(\d+)/i);
+      if (totalMatch) calculatedTotal = parseInt(totalMatch[1], 10);
+    }
+
+    // DUPLICATE CHECK (Last 5 minutes)
     const fiveMinutesAgo = new Date();
     fiveMinutesAgo.setMinutes(fiveMinutesAgo.getMinutes() - 5);
-
     const { data: existingOrder } = await supabase
       .from('orders')
       .select('id')
       .eq('customer_chat_id', chatId)
-      .eq('amount', customerAmount)
-      .eq('items', cleanItems)
+      .eq('amount', calculatedTotal)
+      .eq('items', finalItemsText)
       .gte('created_at', fiveMinutesAgo.toISOString())
       .single();
 
@@ -144,32 +159,31 @@ export async function POST(request) {
       return NextResponse.json({ success: true, message: 'Duplicate' });
     }
 
-    // Save order with PENDING PRICE CONFIRMATION status
+    // Save order DIRECTLY as Pending (No manual price setting needed!)
     let orderId = null;
     const { data, error } = await supabase
       .from('orders')
       .insert({
         customer_name: firstName,
         customer_chat_id: chatId,
-        items: cleanItems,
-        amount: customerAmount, // Customer ka proposed price
-        customer_proposed_amount: customerAmount,
+        items: finalItemsText,
+        amount: calculatedTotal,
         phone: phone,
         address: address,
-        status: 'Pending Price Confirmation', // Naya status!
-        price_confirmed: false,
+        status: 'Pending', // Directly Pending!
         shop_owner_email: targetShopEmail
       })
       .select();
 
-    if (data && data[0]) {
-      orderId = data[0].id;
-    }
+    if (data && data[0]) orderId = data[0].id;
 
-    // Reply to customer - Price confirmation pending
+    // Reply to customer
     if (orderId) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://quickcart-dashboard-ten.vercel.app';
+      const trackLink = `${appUrl}/track/${orderId}`;
+      
       await sendTelegramMessage(shopBotToken, chatId, 
-        `✅ *Order Received!*\n\n *Items:*\n• ${cleanItems}\n\n💰 *Proposed Total:* ₹${customerAmount}\n📍 *Address:* ${address}\n📞 *Phone:* ${phone}\n\n⏳ *The shop will confirm the final price shortly.*\n\n*You will receive a message to confirm the price.*`
+        `✅ *Order Received!*\n\n📦 *Items:*\n• ${finalItemsText}\n\n💰 *Total:* ₹${calculatedTotal}\n📍 *Address:* ${address}\n📞 *Phone:* ${phone}\n\n🔗 *Track:*\n${trackLink}\n\n💾 Shop will confirm shortly.`
       );
     }
 
