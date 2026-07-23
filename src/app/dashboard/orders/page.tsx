@@ -55,7 +55,6 @@ export default function OrdersPage() {
     const { error } = await supabase.from('orders').update(updateData).eq('id', orderId);
 
     if (!error) {
-      // PDF Generation for Pro/Premium on 'Confirmed'
       if (newStatus === 'Confirmed' && orderData?.customer_chat_id) {
         try {
           await fetch('/api/generate-invoice', {
@@ -66,7 +65,6 @@ export default function OrdersPage() {
         } catch (err) { console.error('PDF gen failed:', err); }
       }
 
-      // Telegram Notification
       if (orderData?.customer_chat_id && shopBotToken) {
         let message = '';
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://quickcart-dashboard-ten.vercel.app';
@@ -92,11 +90,11 @@ export default function OrdersPage() {
     }
   }
 
-  // ✅ NEW: Price Confirmation Function
+  // Price Confirmation Function
   async function confirmPrice(orderId: string, finalAmount: number) {
     const { error } = await supabase
       .from('orders')
-      .update({ amount: finalAmount, status: 'Pending', price_confirmed: true })
+      .update({ amount: finalAmount, status: 'Awaiting Customer Approval' })
       .eq('id', orderId);
 
     if (!error) {
@@ -115,7 +113,7 @@ export default function OrdersPage() {
         } catch (err) { console.error('Telegram send failed:', err); }
       }
       fetchData(userEmail);
-      alert(`Price confirmed! Customer notified with final amount ₹${finalAmount}`);
+      alert(`Price sent to customer for confirmation!`);
     } else {
       alert('Failed to confirm price');
     }
@@ -130,7 +128,7 @@ export default function OrdersPage() {
           <div>
             <button onClick={() => router.push('/dashboard')} className="text-blue-600 hover:text-blue-800 font-medium mb-2 flex items-center gap-2">← Back to Dashboard</button>
             <h1 className="text-3xl font-bold text-gray-900">Manage Orders 📦</h1>
-            <p className="text-gray-600 mt-1">View, confirm prices, and update order statuses.</p>
+            <p className="text-gray-600 mt-1">View, confirm prices, and update order statuses step-by-step.</p>
           </div>
         </div>
 
@@ -153,7 +151,57 @@ export default function OrdersPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-sm">
                   {orders.map((order) => {
-                    const isPricePending = order.status === 'Pending Price Confirmation';
+                    
+                    // ✅ SEQUENTIAL BUTTON LOGIC (NO DROPDOWNS!)
+                    const renderActionButtons = () => {
+                      switch (order.status) {
+                        case 'Pending Price Confirmation':
+                          return (
+                            <div className="flex gap-2">
+                              <button onClick={() => {
+                                const newAmount = prompt(`Enter final amount (Current: ₹${order.amount}):`, String(order.amount));
+                                if (newAmount && !isNaN(Number(newAmount))) confirmPrice(order.id, Number(newAmount));
+                              }} className="text-xs bg-yellow-100 text-yellow-700 border border-yellow-200 px-3 py-1.5 rounded-lg hover:bg-yellow-200 transition font-semibold">
+                                Set Final Price
+                              </button>
+                              <button onClick={() => handleUpdateStatus(order.id, 'Rejected')} className="text-xs bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-200 transition font-semibold">
+                                Reject
+                              </button>
+                            </div>
+                          );
+                        case 'Awaiting Customer Approval':
+                          return <span className="text-xs bg-blue-100 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg font-semibold"> Waiting for Customer...</span>;
+                        case 'Pending':
+                          return (
+                            <button onClick={() => handleUpdateStatus(order.id, 'Confirmed')} className="text-xs bg-green-100 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-200 transition font-semibold">
+                              Confirm Order
+                            </button>
+                          );
+                        case 'Confirmed':
+                          return (
+                            <button onClick={() => handleUpdateStatus(order.id, 'Out for Delivery')} className="text-xs bg-blue-100 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-200 transition font-semibold">
+                              Mark Out for Delivery
+                            </button>
+                          );
+                        case 'Out for Delivery':
+                          return (
+                            <button onClick={() => {
+                              if (confirm("⚠️ Are you sure this order has been delivered to the customer?")) {
+                                handleUpdateStatus(order.id, 'Delivered');
+                              }
+                            }} className="text-xs bg-purple-100 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-lg hover:bg-purple-200 transition font-semibold">
+                              Mark Delivered
+                            </button>
+                          );
+                        case 'Delivered':
+                          return <span className="text-xs bg-gray-100 text-gray-500 border border-gray-200 px-3 py-1.5 rounded-lg font-semibold">✅ Completed</span>;
+                        case 'Rejected':
+                          return <span className="text-xs bg-red-100 text-red-500 border border-red-200 px-3 py-1.5 rounded-lg font-semibold">❌ Rejected</span>;
+                        default:
+                          return <span className="text-xs bg-gray-100 text-gray-500 px-3 py-1.5 rounded-lg">No Actions</span>;
+                      }
+                    };
+
                     return (
                       <tr key={order.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4 font-mono text-xs text-gray-500">#{String(order.id).slice(0, 8).toUpperCase()}</td>
@@ -165,52 +213,20 @@ export default function OrdersPage() {
                         <td className="px-6 py-4 font-semibold text-gray-900">₹{order.amount}</td>
                         <td className="px-6 py-4">
                           <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                            isPricePending 
-                              ? 'bg-yellow-50 text-yellow-700 border border-yellow-200'
-                              : order.status === 'Delivered' || order.status === 'Confirmed'
-                              ? 'bg-green-50 text-green-700 border border-green-200'
-                              : order.status === 'Rejected'
-                              ? 'bg-red-50 text-red-700 border border-red-200'
-                              : 'bg-orange-50 text-orange-700 border border-orange-200'
+                            order.status === 'Pending Price Confirmation' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
+                            order.status === 'Awaiting Customer Approval' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                            order.status === 'Delivered' || order.status === 'Confirmed' ? 'bg-green-50 text-green-700 border border-green-200' :
+                            order.status === 'Rejected' ? 'bg-red-50 text-red-700 border border-red-200' :
+                            'bg-orange-50 text-orange-700 border border-orange-200'
                           }`}>
-                            {isPricePending ? '⏳ Price Confirmation' : order.status}
+                            {order.status === 'Pending Price Confirmation' ? '⏳ Set Price' :
+                             order.status === 'Awaiting Customer Approval' ? '⏳ Waiting Customer' :
+                             order.status}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-gray-500 text-xs">{new Date(order.created_at).toLocaleDateString('en-IN')}</td>
                         <td className="px-6 py-4">
-                          {isPricePending ? (
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => {
-                                  const newAmount = prompt(`Enter final amount (Current: ₹${order.amount}):`, String(order.amount));
-                                  if (newAmount && !isNaN(Number(newAmount))) {
-                                    confirmPrice(order.id, Number(newAmount));
-                                  }
-                                }}
-                                className="text-xs bg-green-100 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-200 transition font-semibold"
-                              >
-                                Confirm Price
-                              </button>
-                              <button
-                                onClick={() => handleUpdateStatus(order.id, 'Rejected')}
-                                className="text-xs bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-200 transition font-semibold"
-                              >
-                                Reject
-                              </button>
-                            </div>
-                          ) : (
-                            <select
-                              value={order.status}
-                              onChange={(e) => handleUpdateStatus(order.id, e.target.value)}
-                              className="text-xs border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-600 outline-none bg-white"
-                            >
-                              <option value="Pending">Pending</option>
-                              <option value="Confirmed">Confirmed</option>
-                              <option value="Out for Delivery">Out for Delivery</option>
-                              <option value="Delivered">Delivered</option>
-                              <option value="Rejected">Rejected</option>
-                            </select>
-                          )}
+                          {renderActionButtons()}
                         </td>
                       </tr>
                     );
