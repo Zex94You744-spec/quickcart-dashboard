@@ -111,8 +111,8 @@ export async function POST(request) {
     let addressParts = [];
 
     for (let part of parts) {
-      // Agar number aur unit hai (jaise 2kg, 500g), toh ye ITEM hai
-      if (/(\d+)\s*(kg|g|l|ml|pcs|pkt)?\s*/i.test(part)) {
+      // Ab ye sirf tabhi item maanega jab number ke saath unit (kg, g, pkt, etc.) ho
+      if (/^\d+\s*(kg|g|l|ml|pcs|pkt|dz|dozen)\b/i.test(part)) {
         itemsArray.push(part);
       } else {
         // Nahi toh ye ADDRESS hai (chahe Odia ho, Hindi ho, ya English)
