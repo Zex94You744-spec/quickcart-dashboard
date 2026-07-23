@@ -96,19 +96,36 @@ export async function POST(request) {
       return NextResponse.json({ success: true });
     }
 
-    // 5. EXTRACT DATA
+    // 1. Extract Phone Number (10 digits)
     const phoneMatch = text.match(/(\d{10})/);
     const phone = phoneMatch ? phoneMatch[1] : '';
-    const cityMatch = text.match(/(?:Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad|Bhubaneswar|ଭୁବନେଶ୍ୱର|Cuttack|କଟକ|Rourkela|ରାଉରକେଲା|Berhampur|ବ୍ରହ୍ମପୁର)/i);
-    const address = cityMatch ? cityMatch[0] : 'Not provided';
 
-    let cleanItems = text.replace(/Order:\s*/i, '')
+    // 2. Clean the text: remove "Order:", "total: XXX", and the phone number
+    let cleanText = text
+      .replace(/Order:\s*/i, '')
       .replace(/(?:total|Total|amount|Amount)\s*:?\s*\d+/gi, '')
-      .replace(/,\s*\d{10}/, '')
-      .replace(/,\s*(Delhi|Mumbai|Kardha|Bangalore|Chennai|Kolkata|Pune|Hyderabad)/gi, '')
-      .replace(/,\s*$/, '').trim();
+      .replace(/,\s*\d{10}/, '') // removes ", 7896431205"
+      .replace(/\d{10}/, '')     // removes "7896431205" if no comma
+      .trim();
 
-    let itemsArray = cleanItems.split(',').map(i => i.trim()).filter(i => i.length > 0);
+    // 3. Split by comma to analyze each part
+    const parts = cleanText.split(',').map(p => p.trim()).filter(p => p.length > 0);
+
+    let itemsArray = [];
+    let addressParts = [];
+
+    for (let part of parts) {
+      // If it has a number and looks like an item (e.g., "2kg ପିଆଜ", "500g milk", "3 pkt")
+      if (/(\d+)\s*(kg|g|l|ml|pcs|pkt)?\s*/i.test(part)) {
+        itemsArray.push(part);
+      } else {
+        // Otherwise, it's part of the address (e.g., "Bhubaneswar", "Sector 4", "ଭୁବନେଶ୍ୱର", "କଟକ")
+        addressParts.push(part);
+      }
+    }
+
+    // Join address parts back together
+    const address = addressParts.length > 0 ? addressParts.join(', ') : 'Not provided';
 
     // ✅ 6. AUTO CALCULATE TOTAL (With Debug Logs)
     let calculatedTotal = 0;
