@@ -158,19 +158,22 @@ export async function POST(request) {
       if (totalMatch) calculatedTotal = parseInt(totalMatch[1], 10);
     }
 
-    // 7. DUPLICATE CHECK
+    // ✅ 7. SMART DUPLICATE CHECK (Last 5 minutes)
     const fiveMinutesAgo = new Date();
     fiveMinutesAgo.setMinutes(fiveMinutesAgo.getMinutes() - 5);
+    
     const { data: existingOrder } = await supabase
       .from('orders')
       .select('id')
       .eq('customer_chat_id', chatId)
-      .eq('amount', calculatedTotal)
+      .eq('items', cleanItems) // ✅ Ab ye items ko bhi check karega, sirf amount ko nahi
       .gte('created_at', fiveMinutesAgo.toISOString())
       .single();
 
     if (existingOrder) {
-      console.log(t.duplicateOrder);
+      console.log('⚠️ DEBUG: Duplicate order detected');
+      // Silent fail ki jagah user ko polite message bhejo
+      await sendTelegramMessage(shopBotToken, chatId, "⚠️ ଏହି ଅର୍ଡରଟି ପୂର୍ବରୁ ଗ୍ରହଣ କରାଯାଇସାରିଛି। (This order was already received recently.)");
       return NextResponse.json({ success: true, message: 'Duplicate' });
     }
 
