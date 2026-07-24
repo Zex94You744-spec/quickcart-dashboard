@@ -56,7 +56,7 @@ export default function ProductsPage() {
       .single();
 
     if (existingProduct) {
-      alert(`⚠️ "${newName}" pehle se aapki list mein hai! \nNaya item add karne ke liye alag naam use karein.`);
+      alert(`️ "${newName}" already exists in your list!\nPlease use a different name to add a new item.`);
       setSaving(false);
       return;
     }
