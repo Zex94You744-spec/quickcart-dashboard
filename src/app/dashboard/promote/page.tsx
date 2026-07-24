@@ -65,9 +65,34 @@ export default function PromotePage() {
             {qrCodeUrl && (
               <div className="flex flex-col items-center">
                 <img src={qrCodeUrl} alt="QR Code" className="w-64 h-64 border-4 border-blue-100 rounded-lg mb-4" />
-                <a href={qrCodeUrl} download="shop-qr-code.png" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
-                  📥 Download QR Code
-                </a>
+                <button 
+                  onClick={async () => {
+                    try {
+                      // Fetch the QR code image
+                      const response = await fetch(qrCodeUrl);
+                      const blob = await response.blob();
+                      
+                      // Create download link
+                      const url = window.URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = `${shopName.replace(/\s+/g, '-').toLowerCase()}-qr-code.png`;
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      window.URL.revokeObjectURL(url);
+                      
+                      alert('✅ QR Code downloaded successfully!');
+                    } catch (error) {
+                      console.error('Download error:', error);
+                      alert('❌ Failed to download QR Code. Please try again.');
+                    }
+                  }}
+                  className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition flex items-center gap-2"
+                >
+                  <span>📥</span>
+                  <span>Download QR Code</span>
+                </button>
               </div>
             )}
           </div>
