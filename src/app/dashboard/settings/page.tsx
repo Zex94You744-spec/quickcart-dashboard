@@ -8,16 +8,35 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const languages = [
-  { code: 'odia', name: 'Odia', native: 'ଓଡ଼ିଆ', flag: '🇮🇳' }, // ✅ YE ADD KARO
+  { code: 'odia', name: 'Odia', native: 'ଓଡ଼ିଆ', flag: '🇮🇳' },
   { code: 'hindi', name: 'Hindi', native: 'हिंदी', flag: '🇮🇳' },
   { code: 'english', name: 'English', native: 'English', flag: '🇬🇧' },
+  { code: 'bengali', name: 'Bengali', native: 'বাংলা', flag: '🇮🇳' },
   { code: 'marathi', name: 'Marathi', native: 'मराठी', flag: '🇮🇳' },
   { code: 'gujarati', name: 'Gujarati', native: 'ગુજરાતી', flag: '🇮🇳' },
+  { code: 'punjabi', name: 'Punjabi', native: 'ਪੰਜਾਬੀ', flag: '🇮🇳' },
   { code: 'tamil', name: 'Tamil', native: 'தமிழ்', flag: '🇮🇳' },
   { code: 'telugu', name: 'Telugu', native: 'తెలుగు', flag: '🇮🇳' },
-  { code: 'bengali', name: 'Bengali', native: 'বাংলা', flag: '🇮🇳' },
   { code: 'kannada', name: 'Kannada', native: 'ಕನ್ನಡ', flag: '🇮🇳' },
-  { code: 'punjabi', name: 'Punjabi', native: 'ਪੰਜਾਬੀ', flag: '🇮🇳' },
+  { code: 'malayalam', name: 'Malayalam', native: 'മലയാളം', flag: '🇮🇳' },
+  { code: 'assamese', name: 'Assamese', native: 'অসমীয়া', flag: '🇮🇳' },
+  { code: 'urdu', name: 'Urdu', native: 'اردو', flag: '🇮🇳' },
+  { code: 'bhojpuri', name: 'Bhojpuri', native: 'भोजपुरी', flag: '🇮🇳' },
+  { code: 'rajasthani', name: 'Rajasthani', native: 'राजस्थानी', flag: '🇮🇳' },
+  { code: 'haryanvi', name: 'Haryanvi', native: 'हरियाणवी', flag: '🇮🇳' },
+  { code: 'chhattisgarhi', name: 'Chhattisgarhi', native: 'छत्तीसगढ़ी', flag: '🇮🇳' },
+  { code: 'konkani', name: 'Konkani', native: 'कोंकणी', flag: '🇮🇳' },
+  { code: 'manipuri', name: 'Manipuri', native: 'ꯃꯤꯇꯩꯂꯣꯟ', flag: '🇮🇳' },
+  { code: 'nepali', name: 'Nepali', native: 'नेपाली', flag: '🇮🇳' },
+  { code: 'sindhi', name: 'Sindhi', native: 'سنڌي', flag: '🇮🇳' },
+  { code: 'kashmiri', name: 'Kashmiri', native: 'کٲشُر', flag: '🇮🇳' },
+  { code: 'dogri', name: 'Dogri', native: 'डोगरी', flag: '🇮🇳' },
+  { code: 'maithili', name: 'Maithili', native: 'मैथिली', flag: '🇮🇳' },
+  { code: 'santhali', name: 'Santhali', native: 'ᱥᱟᱱᱛᱟᱲᱤ', flag: '🇮🇳' },
+  { code: 'tulu', name: 'Tulu', native: 'ತುಳು', flag: '🇮🇳' },
+  { code: 'bodo', name: 'Bodo', native: 'बड़ो', flag: '🇮🇳' },
+  { code: 'mizo', name: 'Mizo', native: 'Mizo', flag: '🇮🇳' },
+  { code: 'gondi', name: 'Gondi', native: 'गोंडी', flag: '🇮🇳' },
 ];
 
 export default function SettingsPage() {

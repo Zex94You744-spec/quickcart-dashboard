@@ -49,6 +49,9 @@ export async function POST(request) {
         targetShopEmail = shopOwner.email;
         shopBotToken = shopOwner.bot_token || incomingBotToken;
         shopLanguage = shopOwner.preferred_language || 'hindi';
+        
+        // ✅ DEBUG LOG: Ye humein batayega ki bot kaunsi language padh raha hai
+        console.log('🌍 DEBUG: Shop Email:', targetShopEmail, '| Language:', shopLanguage);
       }
     }
 
