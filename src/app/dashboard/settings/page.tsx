@@ -44,7 +44,16 @@ export default function SettingsPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  
+  // Language State
   const [language, setLanguage] = useState('hindi');
+  
+  // Shop Details State
+  const [shopAddress, setShopAddress] = useState('');
+  const [shopBlock, setShopBlock] = useState('');
+  const [shopDistrict, setShopDistrict] = useState('');
+  const [shopState, setShopState] = useState('');
+  const [shopPincode, setShopPincode] = useState('');
 
   useEffect(() => {
     const email = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
@@ -60,21 +69,35 @@ export default function SettingsPage() {
     if (data) {
       setUser(data);
       setLanguage(data.preferred_language || 'hindi');
+      setShopAddress(data.shop_address || '');
+      setShopBlock(data.shop_block || '');
+      setShopDistrict(data.shop_district || '');
+      setShopState(data.shop_state || '');
+      setShopPincode(data.shop_pincode || '');
     }
     setLoading(false);
   }
 
-  async function handleSaveSettings() {
+  async function handleSaveSettings(e: React.FormEvent) {
+    e.preventDefault();
     setSaving(true);
+    
     const { error } = await supabase
       .from('leads')
-      .update({ preferred_language: language })
+      .update({ 
+        preferred_language: language,
+        shop_address: shopAddress,
+        shop_block: shopBlock,
+        shop_district: shopDistrict,
+        shop_state: shopState,
+        shop_pincode: shopPincode
+      })
       .eq('email', user.email);
     
     if (!error) {
-      alert('Settings saved successfully!');
+      alert('✅ Settings saved successfully!');
     } else {
-      alert('Failed to save settings');
+      alert('Failed to save settings: ' + error.message);
     }
     setSaving(false);
   }
@@ -83,48 +106,126 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <button onClick={() => router.push('/dashboard')} className="text-blue-600 hover:text-blue-800 font-medium mb-4 flex items-center gap-2">← Back to Dashboard</button>
         
         <h1 className="text-3xl font-bold text-gray-900 mb-6">⚙️ Shop Settings</h1>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">🌍 Preferred Language</h2>
-          <p className="text-gray-600 mb-4">Select the language for your Telegram bot messages.</p>
+        <form onSubmit={handleSaveSettings} className="space-y-8">
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {languages.map((lang) => (
-              <button
-                key={lang.code}
-                onClick={() => setLanguage(lang.code)}
-                className={`p-4 rounded-xl border-2 text-left transition ${
-                  language === lang.code
-                    ? 'border-blue-600 bg-blue-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">{lang.flag}</span>
-                  <div>
-                    <div className="font-semibold text-gray-900">{lang.native}</div>
-                    <div className="text-sm text-gray-500">{lang.name}</div>
+          {/* 1. Language Selection */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-2">🌍 Preferred Language</h2>
+            <p className="text-gray-600 mb-4">Select the language for your Telegram bot messages.</p>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-96 overflow-y-auto pr-2">
+              {languages.map((lang) => (
+                <button
+                  key={lang.code}
+                  type="button"
+                  onClick={() => setLanguage(lang.code)}
+                  className={`p-3 rounded-xl border-2 text-left transition ${
+                    language === lang.code
+                      ? 'border-blue-600 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{lang.flag}</span>
+                    <div>
+                      <div className="font-semibold text-gray-900 text-sm">{lang.native}</div>
+                      <div className="text-xs text-gray-500">{lang.name}</div>
+                    </div>
+                    {language === lang.code && <span className="ml-auto text-blue-600 font-bold">✓</span>}
                   </div>
-                  {language === lang.code && (
-                    <span className="ml-auto text-blue-600 font-bold">✓</span>
-                  )}
-                </div>
-              </button>
-            ))}
+                </button>
+              ))}
+            </div>
           </div>
 
+          {/* 2. Shop Location & Details */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-2">📍 Shop Location & Details</h2>
+            <p className="text-gray-600 mb-4">Add your shop details so customers can find you by Block/District.</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Shop Full Address</label>
+                <input
+                  type="text"
+                  value={shopAddress}
+                  onChange={(e) => setShopAddress(e.target.value)}
+                  placeholder="e.g., Main Road, Near Temple"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Block / Area</label>
+                <input
+                  type="text"
+                  value={shopBlock}
+                  onChange={(e) => setShopBlock(e.target.value)}
+                  placeholder="e.g., Sector 4"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">District</label>
+                <input
+                  type="text"
+                  value={shopDistrict}
+                  onChange={(e) => setShopDistrict(e.target.value)}
+                  placeholder="e.g., Khordha"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                <input
+                  type="text"
+                  value={shopState}
+                  onChange={(e) => setShopState(e.target.value)}
+                  placeholder="e.g., Odisha"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Pincode</label>
+                <input
+                  type="text"
+                  value={shopPincode}
+                  onChange={(e) => setShopPincode(e.target.value)}
+                  placeholder="e.g., 751001"
+                  maxLength={6}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Save Button */}
           <button
-            onClick={handleSaveSettings}
+            type="submit"
             disabled={saving}
-            className="mt-6 w-full bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50"
+            className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {saving ? 'Saving...' : '💾 Save Settings'}
+            {saving ? (
+              <>
+                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Saving...
+              </>
+            ) : (
+              '💾 Save All Settings'
+            )}
           </button>
-        </div>
+        </form>
       </div>
     </div>
   );

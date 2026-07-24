@@ -43,13 +43,30 @@ export default function ProductsPage() {
   async function handleAddProduct(e: React.FormEvent) {
     e.preventDefault();
     if (!newName || !newPrice) return;
+    
+    const cleanName = newName.toLowerCase().trim();
     setSaving(true);
 
+    // ✅ 1. CHECK FOR DUPLICATES (Case-insensitive)
+    const { data: existingProduct } = await supabase
+      .from('products')
+      .select('id')
+      .eq('shop_owner_email', userEmail)
+      .ilike('name', cleanName)
+      .single();
+
+    if (existingProduct) {
+      alert(`⚠️ "${newName}" pehle se aapki list mein hai! \nNaya item add karne ke liye alag naam use karein.`);
+      setSaving(false);
+      return;
+    }
+
+    // ✅ 2. ADD NEW PRODUCT
     const { error } = await supabase
       .from('products')
       .insert([{
         shop_owner_email: userEmail,
-        name: newName.toLowerCase().trim(),
+        name: cleanName,
         unit: newUnit.trim(),
         price: parseInt(newPrice)
       }]);
@@ -57,7 +74,7 @@ export default function ProductsPage() {
     if (!error) {
       setNewName(''); setNewUnit('1kg'); setNewPrice('');
       fetchProducts(userEmail);
-      alert('Product added successfully!');
+      alert('✅ Item successfully added!');
     } else {
       alert('Failed to add product: ' + error.message);
     }
