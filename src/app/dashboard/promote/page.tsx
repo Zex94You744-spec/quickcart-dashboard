@@ -13,6 +13,7 @@ export default function PromotePage() {
   const [shopName, setShopName] = useState('');
   const [botUsername, setBotUsername] = useState('');
   const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const email = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
@@ -25,21 +26,26 @@ export default function PromotePage() {
   }, []);
 
   async function fetchShopDetails(email: string) {
-    const { data } = await supabase.from('leads').select('shop_name, bot_token').eq('email', email).single();
+    const { data } = await supabase.from('leads').select('shop_name, bot_username').eq('email', email).single();
     if (data) {
+      const username = data.bot_username || 'YourBot';
       setShopName(data.shop_name || 'Your Shop');
-      // Extract bot username from token (simplified)
-      setBotUsername('YourTelegramBot');
-      // Generate QR Code URL using Telegram link
-      const botLink = `https://t.me/QuickCartDelivery_bot`;
+      setBotUsername(username);
+      
+      // Generate QR Code URL using actual Telegram link
+      const botLink = `https://t.me/${username}`;
       const qrApi = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(botLink)}`;
       setQrCodeUrl(qrApi);
     }
+    setLoading(false);
   }
 
-  const shareMessage = ` *${shopName}*\n\nAb ghar baithe order karein! Hamara Telegram Bot use karein:\nhttps://t.me/YourTelegramBot\n\nFast delivery, best prices! 🚀`;
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+
+  const botLink = `https://t.me/${botUsername}`;
+  const shareMessage = ` *${shopName}*\n\nAb ghar baithe order karein! Hamara Telegram Bot use karein:\n${botLink}\n\nFast delivery, best prices! 🚀`;
   const whatsappLink = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
-  const telegramLink = `https://t.me/share/url?url=https://t.me/QuickCartDelivery_bot&text=${encodeURIComponent(shareMessage)}`;
+  const telegramShareLink = `https://t.me/share/url?url=${encodeURIComponent(botLink)}&text=${encodeURIComponent(shareMessage)}`;
 
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-4 sm:px-6 lg:px-8">
@@ -77,14 +83,14 @@ export default function PromotePage() {
                 <span className="font-semibold">Share on WhatsApp</span>
               </a>
               
-              <a href={telegramLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 w-full bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 transition">
+              <a href={telegramShareLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 w-full bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 transition">
                 <span className="text-2xl">✈️</span>
                 <span className="font-semibold">Share on Telegram</span>
               </a>
               
               <button 
                 onClick={() => {
-                  navigator.clipboard.writeText(`https://t.me/QuickCartDelivery_bot`);
+                  navigator.clipboard.writeText(botLink);
                   alert('Bot link copied to clipboard!');
                 }}
                 className="flex items-center gap-3 w-full bg-gray-100 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-200 transition"
@@ -100,10 +106,10 @@ export default function PromotePage() {
             <h2 className="text-xl font-bold mb-2">🔗 Your Bot Link</h2>
             <p className="text-blue-100 mb-4">Share this link with your customers:</p>
             <div className="bg-white bg-opacity-20 rounded-lg p-4 flex items-center justify-between">
-              <code className="text-lg font-mono">https://t.me/QuickCartDelivery_bot</code>
+              <code className="text-lg font-mono">{botLink}</code>
               <button 
                 onClick={() => {
-                  navigator.clipboard.writeText(`https://t.me/QuickCartDelivery_bot`);
+                  navigator.clipboard.writeText(botLink);
                   alert('Link copied!');
                 }}
                 className="bg-white text-blue-600 px-4 py-2 rounded-lg font-semibold hover:bg-blue-50 transition"

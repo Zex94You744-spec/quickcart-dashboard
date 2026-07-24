@@ -54,6 +54,7 @@ export default function SettingsPage() {
   const [shopDistrict, setShopDistrict] = useState('');
   const [shopState, setShopState] = useState('');
   const [shopPincode, setShopPincode] = useState('');
+  const [botUsername, setBotUsername] = useState('');
 
   useEffect(() => {
     const email = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
@@ -74,6 +75,7 @@ export default function SettingsPage() {
       setShopDistrict(data.shop_district || '');
       setShopState(data.shop_state || '');
       setShopPincode(data.shop_pincode || '');
+      setBotUsername(data.bot_username || '');
     }
     setLoading(false);
   }
@@ -90,7 +92,8 @@ export default function SettingsPage() {
         shop_block: shopBlock,
         shop_district: shopDistrict,
         shop_state: shopState,
-        shop_pincode: shopPincode
+        shop_pincode: shopPincode,
+        bot_username: botUsername
       })
       .eq('email', user.email);
     
@@ -203,6 +206,18 @@ export default function SettingsPage() {
                   maxLength={6}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none"
                 />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Telegram Bot Username</label>
+                <input
+                  type="text"
+                  value={botUsername}
+                  onChange={(e) => setBotUsername(e.target.value)}
+                  placeholder="e.g., Maf_bot (without @)"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none"
+                />
+                <p className="text-xs text-gray-500 mt-1">Enter your bot username without @ symbol (e.g., Maf_bot)</p>
               </div>
             </div>
           </div>
